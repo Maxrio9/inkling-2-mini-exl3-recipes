@@ -1,0 +1,6 @@
+# Pass the downloaded model directory on the command line.
+# Context includes input and output, per request.
+context = 69632
+parallel = 4
+kv-cache = "fp8"
+prompt-cache-gib = 0

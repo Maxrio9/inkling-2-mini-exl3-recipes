@@ -1,42 +1,42 @@
 # Inkling 2 Mini on your GPU
 
-Text-only TabbyAPI recipes for [Inkling 2 Mini EXL3](https://huggingface.co/Maxrio/Inkling-2-Mini-exl3). [Engine](https://github.com/Maxrio9/exllamav3-inkling2) · [Measurements](data/MEASUREMENTS.md)
+Text-only TensorFold recipes for [our Inkling 2 Mini EXL3 quants](https://huggingface.co/Maxrio/Inkling-2-Mini-exl3). They use FP8 KV, with the bundled DSpark drafter enabled where memory allows. [Engine branch](https://github.com/Maxrio9/TensorFold/tree/inkling2-mini-exl3) · [Measurements and calculations](data/MEASUREMENTS.md)
 
-| GPU | Branch | KV | Pool without desktop | Pool with desktop | Measured decode / prefill tok/s (hardware) |
-|---|---|---|---:|---:|---|
-| 12 GB | No current branch fits | — | — | — | — |
-| 16 GB | 3.3bpw | Q8 | [155,648](configs/tabby-16gb-no-dspark.yml) | [94,208](configs/tabby-16gb-desktop-no-dspark.yml) | 47.5 / 2,200 (RTX PRO 4500, 8k prompt) |
-| 24 GB | 4.0bpw | Q8 | [483,328](configs/tabby-24gb-no-dspark.yml) | [417,792](configs/tabby-24gb-desktop-no-dspark.yml) | not yet measured on a desktop card with this engine |
-| 32 GB | 4.0bpw | Q8 | [897,024](configs/tabby-32gb-no-dspark.yml) | [835,584](configs/tabby-32gb-desktop-no-dspark.yml) | not yet measured on a desktop card with this engine |
-| DGX Spark | 4.0bpw | Q8 | [1,048,576](configs/tabby-dgx-spark-4.0bpw-q8.yml) | — | 26.7 / 745.9 (DGX Spark, 8k) |
+| Card | Branch | Desktop reserve | Parallel requests | Context per request | DSpark | Measured decode |
+|---|---|---|---:|---:|---|---|
+| 12 GB | No branch fits | — | — | — | — | — |
+| 16 GB | 3.3bpw | None | 1 | [53,248](configs/16gb.toml) | On | RTX PRO 4500, 3.3bpw, c=1: code 126.7, prose 81.8, plain 66.5 tok/s |
+| 16 GB | 3.3bpw | None | 1 | [106,496](configs/16gb-long.toml) | Off | Nearest: RTX PRO 4500, 3.3bpw, c=1, plain 66.5 tok/s |
+| 16 GB | 3.3bpw | 1 GiB | 1 | [45,056](configs/16gb-desktop.toml) | Off | Nearest: RTX PRO 4500, 3.3bpw, c=1, plain 66.5 tok/s |
+| 24 GB | 4.0bpw | None | 4 | [69,632](configs/24gb.toml) | On | Nearest: RTX PRO 4500, 3.3bpw, c=4, DSpark on: 140 aggregate tok/s |
+| 24 GB | 4.0bpw | 1 GiB | 6 | [32,768](configs/24gb-desktop.toml) | On | Nearest: RTX PRO 4500, 3.3bpw, c=4, DSpark on: 140 aggregate tok/s |
+| 32 GB | 4.0bpw | None | 9 | [65,536](configs/32gb.toml) | On | Nearest: RTX PRO 4500, 3.3bpw, c=4, DSpark on: 140 aggregate tok/s |
+| 32 GB | 4.0bpw | 1 GiB | 14 | [32,768](configs/32gb-desktop.toml) | On | Nearest: RTX PRO 4500, 3.3bpw, c=4, DSpark on: 140 aggregate tok/s |
+| DGX Spark | 4.0bpw | None | 16 | [221,184](configs/dgx-spark.toml) | On | DGX Spark, 4.0bpw, c=1: code 59.2, prose 42.2, plain 36.3; c=4 plain 74.4 aggregate tok/s |
+| DGX Spark | 4.0bpw | 1 GiB | 16 | [217,088](configs/dgx-spark-desktop.toml) | On | Same measurement as above |
 
-Pool sizes are **projections** from measured Q8 memory, rounded down to 4,096 tokens and capped at 1,048,576. They have not been tested at their limits. The corresponding FP16 setups passed end-to-end five-fact retrieval checks at their limits; the 24/32 GB checks used the 4.75bpw branch. Desktop card classes were simulated on the RTX PRO 4500. Speeds are measured through TabbyAPI at an 8,192-token prompt, not at the pool limits: decode / prefill tok/s, median of three requests, one request at a time. With the 16-bit KV cache the same 16 GB setup decodes at 61.5 tok/s (2,230 tok/s prefill); the 8-bit cache trades that speed for about twice the context. Card classes are simulated with memory caps on an RTX PRO 4500; details are in [Measurements](data/MEASUREMENTS.md).
+**Every capacity is computed**, including the 4.0bpw desktop estimates derived from measured 3.3bpw desktop allocations and the measured weight difference. Desktop card sizes use nominal GiB budgets; actual usable memory varies. On 16 GB, DSpark needs the headless setup; choose the plain configs for more context or a desktop session. The Spark projection assumes 116.48 GiB initially available, a 24 GiB system reserve and a 100 GiB allocation cap. Context includes prompt and output. These projected limits and the listed concurrency settings have not been tested at their edges. Concurrency above eight has not been tested; Spark c=4 was tested with drafting disabled. Speed numbers are measured at 8,192 prompt tokens, 400 output tokens, greedy sampling, no prompt cache, median of three; aggregate is shared decode, not per-request speed. They do not predict performance at the listed context limits.
 
-1. Install a matching CUDA toolkit and PyTorch, then build the [engine](https://github.com/Maxrio9/exllamav3-inkling2), choosing `12.0` (sm_120), `12.1` (sm_121), or `8.6` (sm_86):
-
-   ```sh
-   git clone https://github.com/Maxrio9/exllamav3-inkling2.git engine
-   cd engine
-   TORCH_CUDA_ARCH_LIST=12.0 pip install --no-build-isolation .
-   cd ..
-   ```
-
-2. Check out TabbyAPI at `47281587fafbd69e50aaf77c7626f390811126b6`, apply the patch, and install its dependencies according to its README:
+1. Install Zig 0.17.0 and a CUDA toolkit with `nvcc` (the tests used CUDA 13.4.92; drivers 615.78.08 on RTX PRO 4500 and 595.99.02 on DGX Spark). Build the branch on the target machine:
 
    ```sh
-   git clone https://github.com/theroyallab/tabbyAPI.git tabbyAPI
-   cd tabbyAPI
-   git checkout 47281587fafbd69e50aaf77c7626f390811126b6
-   git apply ../engine/patches/tabby-inkling2.patch
+   git clone --branch inkling2-mini-exl3 https://github.com/Maxrio9/TensorFold.git
+   cd TensorFold
+   git checkout 70d6031b52d158e0ce21eb4b54f454ce714370e8
+   zig build -Dgpu=sm_120 -Dnvcc=/usr/local/cuda/bin/nvcc
    ```
 
-3. Download the model branch into a folder named `3.3bpw` or `4.0bpw` under your model directory. Copy the linked recipe to TabbyAPI's `config.yml`, then start from that checkout, replacing the example paths:
+   On DGX Spark, use `zig build -Dgpu=sm_121 -Dnvcc=/usr/local/cuda/bin/nvcc` instead. The binary is `zig-out/native/bin/tensorfold-native`. See the engine's `RUNBOOK.md` for prerequisites and optional structured-output support. 
+2. Download the appropriate model branch into a local directory, including its bundled drafter. Clone this recipes repository and run, replacing both example paths:
 
    ```sh
-   cp /path/to/recipes/configs/tabby-24gb-no-dspark.yml config.yml
-   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True python3 main.py --model-dir /path/to/models --host 127.0.0.1 --port 5027 --disable-auth true --web-ui false --allowed-origins http://127.0.0.1:5027
+   zig-out/native/bin/tensorfold-native serve /path/to/model --config /path/to/recipes/configs/24gb.toml
    ```
 
-The DGX Spark limit is also a projection: the million-token FP16 check used 4.75bpw, not this Q8 config. Its tested launch used a PyTorch memory fraction of 0.55 and a 24 GiB host-memory guard. Ensure sufficient free host memory; pool includes prompt and output.
+   TensorFold automatically loads the bundled drafter except in the two 16 GB plain configs, which set `no-drafts = true`. `--no-drafts` turns it off; `--kv-cache bf16` selects BF16 KV. Each config disables retained prompt caching and sets the per-request window and maximum parallel requests. Check startup admission and lower context or concurrency if necessary.
 
-Serve one text request at a time. Image inputs have not been qualified for these recipes. DSpark is disabled: the engine refuses Q8 with DSpark, and DSpark showed no qualified prose speedup through TabbyAPI.
+DSpark's gain depends on content: the measured code gain was large, the prose gain smaller, and at four parallel desktop requests there was essentially no gain. The engine currently serves text only for this model. Five-fact retrieval returned 5/5 with a 130,808-token prompt on RTX PRO 4500 and a 262,144-token prompt on DGX Spark; these are individual checks, not validation of every projected limit. See [measurements](data/MEASUREMENTS.md) for settings and limitations. The [legacy configs](configs/legacy-exllamav3/) and `tools/` belong to the previous ExLlamaV3 release.
+
+## Credits
+
+TensorFold by [@ashhart](https://github.com/ashhart) and contributors; model by [Thinking Machines](https://huggingface.co/thinkingmachines/Inkling-2-Mini). This engine uses upstream TensorFold work from [#3612](https://github.com/ashhart/TensorFold/pull/3612) @francip; [#4127](https://github.com/ashhart/TensorFold/pull/4127), [#4128](https://github.com/ashhart/TensorFold/pull/4128), [#4746](https://github.com/ashhart/TensorFold/pull/4746), [#4841](https://github.com/ashhart/TensorFold/pull/4841), [#4124](https://github.com/ashhart/TensorFold/pull/4124) @ajensenwaud; [#4697](https://github.com/ashhart/TensorFold/pull/4697) @jschmied (Jürgen Schmied); [#4786](https://github.com/ashhart/TensorFold/pull/4786) @jschmied and @ashhart; [#4337](https://github.com/ashhart/TensorFold/pull/4337), [#4704](https://github.com/ashhart/TensorFold/pull/4704) @BlivionIaG; [#4471](https://github.com/ashhart/TensorFold/pull/4471) @grantoverton; and [#4784](https://github.com/ashhart/TensorFold/pull/4784) @cwschroeder.
