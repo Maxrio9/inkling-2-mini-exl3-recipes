@@ -1,22 +1,20 @@
 # TensorFold measurements
 
-These are served measurements, not speed projections. Slices S1–S6 used development builds leading to TensorFold branch `inkling2-mini-exl3`, final source commit `70d6031b52d158e0ce21eb4b54f454ce714370e8`; the individual builds predate that commit. S1 used source based on `42bbc8e35`, S4 `a1c1f8d53`, and S6 used builds based on `cb54db840`. The final commit has not itself been benchmarked. RTX PRO 4500 Blackwell: sm_120, NVIDIA driver 615.78.08. DGX Spark GB10: sm_121, driver 595.99.02. Builds used Zig 0.17.0 and CUDA nvcc 13.4.92. Speeds are decode unless otherwise stated; prompt and output counts and other settings appear below. Earlier ExLlamaV3 measurement tables were dropped from this file; legacy configs remain in `configs/legacy-exllamav3/`.
+Slices S1–S6 used development builds of TensorFold leading to commit `70d6031b52d158e0ce21eb4b54f454ce714370e8` on `inkling2-mini-exl3`. S1 was based on `42bbc8e35`, S4 on `a1c1f8d53` and S6 on `cb54db840`. The release archive was checked with a short served request on RTX PRO 4500. RTX PRO 4500 Blackwell used sm_120 and NVIDIA driver 615.78.08. DGX Spark GB10 used sm_121 and driver 595.99.02. The benchmark builds used Zig 0.17.0 and CUDA nvcc 13.4.92. Decode rates exclude the first generated token.
 
-## S1: initial server and parity
+## S1: initial server
 
-RTX PRO 4500, 3.3bpw, one stream, BF16 KV, no drafts, no retained prompt cache, greedy, 128-token output cap; speed median of three. Reference used the same pack in ExLlamaV3, FP16 KV and FP16 output head, versus BF16 KV and head here.
+RTX PRO 4500, 3.3bpw, one stream, BF16 KV, no drafts, no retained prompt cache, greedy, 128-token output cap. Rates and times are medians of three.
 
 | Measure | Result |
 |---|---:|
 | 2,048 prompt decode | 66.57 tok/s |
 | 8,192 prompt decode | 66.49 tok/s |
 | Cold TTFT, 2,048 / 8,192 prompt | 0.778 / 3.193 s |
-| Exact greedy first 64 tokens | 10/16 prompts |
-| Teacher-forced top-1 agreement | 1,015/1,024 (99.12%) |
 
 ## S2: graph and BF16 KV drafter
 
-RTX PRO 4500, 3.3bpw, one stream, BF16 KV, 8,192 input tokens, 400 output tokens, warm server, no cached prompt tokens; median of three. Requested effort `none`, though the model generated reasoning. Temperature is shown below.
+RTX PRO 4500, 3.3bpw, one stream, BF16 KV, 8,192 input tokens, 400 output tokens, warm server and zero cached prompt tokens. Rates are medians of three. The requests set reasoning effort to `none` and the output still included reasoning.
 
 | Workload | Temperature | Plain tok/s | DSpark tok/s | Accepted/proposed |
 |---|---:|---:|---:|---:|
@@ -29,18 +27,18 @@ At a 2,048-token prompt and 128-token output cap, graph candidate decode was 68.
 
 ## S3: FP8 KV
 
-RTX PRO 4500, 3.3bpw, one stream, 8,192 input tokens, 400 output tokens, greedy, warm, no prompt cache, DSpark; median of three.
+RTX PRO 4500, 3.3bpw, one stream, 8,192 input tokens, 400 output tokens, greedy sampling, warm server, zero cached prompt tokens and DSpark. Rates are medians of three.
 
 | Workload | BF16 control A | FP8 | BF16 control B | FP8 accepted/proposed |
 |---|---:|---:|---:|---:|
 | Code | 118.35 | 123.64 | 117.62 | 847/1,546 |
 | Prose | 79.88 | 78.33 | 79.82 | 576/1,555 |
 
-FP8 versus BF16 KV teacher-forced top-1 matched 1,080/1,088 positions (99.26%); mean KL was 0.008890 nats. FP8 DSpark verification matched 4,408/4,408 plain FP8 positions, zero measured KL. These checks do not establish identical output between KV formats.
+FP8 versus BF16 KV teacher-forced top-1 matched 1,080/1,088 positions (99.26%); mean KL was 0.008890 nats. FP8 DSpark verification matched 4,408/4,408 plain FP8 positions, with zero measured KL. Changing the target KV format from BF16 to FP8 changed the greedy completions on both timing prompts.
 
 ## S4: retrieval
 
-RTX PRO 4500, 3.3bpw, one stream, DSpark, no prompt cache, requested effort `none`; normal completion with a 256-token output cap. Each is one five-fact test.
+RTX PRO 4500, 3.3bpw, one stream, DSpark, zero cached prompt tokens and requested effort `none`. Each row is one five-fact test that finished normally with a 256-token output cap.
 
 | KV | Prompt tokens | Correct facts | Output tokens | Cold TTFT (s) | Decode tok/s | Sampled process peak MiB |
 |---|---:|---:|---:|---:|---:|---:|
@@ -52,7 +50,7 @@ The 131,072-token server window was preallocated for all rows. The 128-token out
 
 ## S5: concurrency before batch-aware policy
 
-RTX PRO 4500, 3.3bpw, FP8 KV, 8,704-token window, eight allocated slots, 8,192-token input, 400-token output, greedy, no prompt cache, three repeats. Shared aggregate counts decode only over the common interval; delivery aggregate includes prefill overlap and tail.
+RTX PRO 4500, 3.3bpw, FP8 KV, 8,704-token window, eight allocated slots, 8,192-token input, 400-token output, greedy sampling, zero cached prompt tokens and three repeats. Shared aggregate measures the interval when all requests decode. Delivery aggregate includes prefill overlap and the time after the first request finishes.
 
 | Concurrent | Mode | Shared aggregate tok/s | Delivery aggregate tok/s |
 |---:|---|---:|---:|
@@ -64,7 +62,7 @@ All 84 concurrent completions matched their solo control. Four-stream shared ver
 
 ## S6: batch-aware policy and DGX Spark
 
-Same 8k prompts and sampling as S5, three repeats. RTX PRO 4500 used 3.3bpw; DGX Spark used 4.0bpw. Both used FP8 KV; the Spark c=4 run used plain decoding. Listed rates are shared decode medians.
+Both machines used the S5 prompts, 8,192 input tokens, 400 output tokens, greedy sampling, zero cached prompt tokens and three repeats. RTX PRO 4500 used 3.3bpw with eight allocated slots. DGX Spark used 4.0bpw with four allocated slots. Both used FP8 KV and an 8,704-token window. The four-request Spark run used plain decoding. Rates are shared decode medians.
 
 | Hardware | Concurrency, workload | Plain tok/s | DSpark tok/s |
 |---|---|---:|---:|
@@ -76,12 +74,30 @@ Same 8k prompts and sampling as S5, three repeats. RTX PRO 4500 used 3.3bpw; DGX
 | DGX Spark | 1, prose | 36.31 | 42.16 |
 | DGX Spark | 4, mixed aggregate | 74.41 | Not tested |
 
-The Spark c=4 delivery aggregate was 26.07 tok/s. All 144 desktop and 24 Spark timed completions matched their corresponding target token IDs. A single Spark retrieval test with a 262,144-token prompt and 227 output tokens returned 5/5 facts, cold TTFT 512.36 s. Spark peak process RSS was 29.37 GiB at 8,704 × 4 and 29.49 GiB at 262,656 × 1; minimum system available memory was 97.67 and 93.15 GiB respectively. These RSS figures include loading and are not discrete GPU memory.
+The Spark c=4 delivery aggregate was 26.07 tok/s. All 144 desktop and 24 Spark timed completions matched their corresponding target token IDs. A single Spark retrieval test with a 262,144-token prompt and 227 output tokens returned 5/5 facts, cold TTFT 512.36 s. Spark peak process RSS was 29.37 GiB at 8,704 × 4 and 29.49 GiB at 262,656 × 1; minimum system available memory was 97.67 and 93.15 GiB respectively. These RSS figures include loading and measure process memory on the unified-memory Spark.
 
-## Capacity projections
+## Capacity: TensorFold's planner
 
-The README configurations are projections, not tested fits. Model context is capped at 1,048,576 tokens. FP8 target KV costs 16,896 bytes per global token and drafter KV 4,096 bytes per token; target KV rounds up in 64-token steps. Estimates include context-dependent target and drafter attention scratch, fixed local rings, and stream state. The 3.3bpw desktop target weights measured 12,428,430,336 bytes; 4.0bpw target weights measured 14,721,666,048 bytes on Spark. The difference, 2,293,235,712 bytes, is added to the desktop 3.3bpw estimate for 4.0bpw. Drafter weights measured 739,122,944 bytes.
+Every config's context comes from `tensorfold-native plan`, recorded per config in [planner/](planner/). The planner reads the model branch's checkpoint headers and runs the engine's own sizing and startup admission without a GPU: target and drafter weights, working buffers, KV cache and per-request state, then the weight, first-request and parallel-request checks the server makes at startup. It reports bytes per component and the largest admitted context per request.
 
-The single-stream 16 GB projection uses the S3 FP8 process peak of 14,936 MiB at 8,704 tokens, with measured fixed overhead 2,311,263,488 bytes. Multi-stream discrete estimates use the S5 eight-slot process peak 18,708 MiB, adjusted by 479,944,712 bytes per stream at 8,704; 294,912 bytes per stream is added for S6's new buffer. Spark uses its measured four-slot tracked anchor 19,134,608,880 bytes, 480,239,624 bytes per stream and 1,979,980,328 bytes for the largest observed additional available-memory drop. All estimates add 0.3 GiB allocator slack plus 243,531,776 bytes, the observed S3 fixed-overhead variation between BF16 and FP8. Desktop rows additionally reserve 1 GiB. Spark uses a budget of 92.48 GiB derived from 116.48 GiB available before launch minus 24 GiB, subject to a 100 GiB cap; the desktop row subtracts another 1 GiB. Other workloads and drivers can change these footprints.
+| Planner input | Value |
+|---|---|
+| Card memory | 16,303 / 24,564 / 32,607 MiB (the smallest common card of each class, as `nvidia-smi` reports it) |
+| DGX Spark | 124,608 MiB total, 119,280 MiB available before launch (measured on an idle Spark), unified |
+| Driver and CUDA context outside the engine's allocations | 335 MiB (measured on the RTX PRO 4500: 290 to 361 MiB at peak) |
+| Desktop rows | 1 GiB less free memory at startup |
+| Engine reserve | 0.5 GiB on 16 GB cards (the engine's minimum); default elsewhere: 1 GiB discrete, 12.2 GiB on Spark |
+| KV, prompt cache | FP8, none |
+| Rounding | Down to a multiple of 1,024 tokens |
 
-The maximum supported count considered is 16 slots. For each row the largest count that allows at least 65,536 tokens without a desktop or 32,768 with a desktop was chosen; if none qualifies, one DSpark request is used. Contexts are rounded down to 4,096 tokens. At 16 GB without desktop the one-stream DSpark result is 53,248 tokens. With DSpark disabled, the same single-stream FP8 anchor and margins, less 739,122,944 bytes of drafter weights and 4,096 bytes per token of drafter KV, give 107,904 tokens without desktop and 47,360 with desktop before rounding: 106,496 and 45,056 respectively. Context-dependent drafter scratch growth is also removed; the anchor retains fixed drafter overhead, making this estimate conservative. The 24/32 GB desktop-card numbers use the desktop 3.3bpw anchor plus the measured weight difference and have not been measured with 4.0bpw. The Spark 16-slot and discrete 9/14-slot configurations exceed measured concurrency; allocation scaling and long-context scratch are extrapolations. No edge-fit or 128k speed test exists for these exact configurations. Usable VRAM, free unified memory, retained caches and other applications can reduce fit.
+### Checks against real servers
+
+On the RTX PRO 4500 with the 3.3bpw branch, `TENSORFOLD_CUDA_MEMORY_LIMIT_GB` emulated the startup budget of a 16 GB card (14.59 GiB) and a 24 GB card (22.66 GiB). In every case the server started at the planner's maximum, served a request filling the window, and refused to start one token above it. The engine's tracked allocation matched the planner to the byte.
+
+| Emulated card | Requests | DSpark | Planner maximum | At maximum | One token more | Request near the edge | Tracked bytes, planner = server |
+|---|---:|---|---:|---|---|---|---:|
+| 16 GB | 1 | On | 21,440 | Started | Refused | 21,251 + 128 tokens, completed | 15,669,206,488 |
+| 16 GB | 1 | Off | 73,856 | Started | Refused | 73,667 + 128 tokens, completed | 15,669,583,832 |
+| 24 GB | 2 | On | 204,672 | Started | Refused | 2 × 204,483 + 128 tokens, concurrent, completed | 24,331,956,192 |
+
+These checks used the default 1 GiB reserve. The 4.0bpw plan reproduces the DGX Spark server's tracked allocation at both measured points exactly: 19,134,608,880 bytes at 8,704 tokens × 4 requests and 23,356,319,192 bytes at 262,656 tokens × 1 request. Device memory outside the engine's allocations peaked at 361 MiB, inside the reserve. Other programs on the GPU lower the free memory the engine starts from; leave room for them or use the desktop rows.

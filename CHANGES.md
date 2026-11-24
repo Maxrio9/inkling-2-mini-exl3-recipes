@@ -1,8 +1,8 @@
-# Changes from the published recipes
+# Changes
 
-- Replaced the TabbyAPI / ExLlamaV3 recommendations with TensorFold and FP8 KV plus bundled, batch-aware DSpark.
-- Recomputed branch, parallelism and per-request contexts for desktop and non-desktop card classes; 4.0bpw desktop and all capacity limits are projections. Added the 1 GiB Spark desktop scenario.
-- Moved historical TabbyAPI configs to `configs/legacy-exllamav3/`; the old helper scripts remain historical.
-- Replaced the measurement file with TensorFold S1–S6 results; dropped the previous engine tables. Added upstream credits, build and launch instructions, and revised the separate model-card draft.
-- Added 16 GB plain-decoding options: 106,496 tokens headless and 45,056 with a desktop reserve; the headless DSpark option remains available.
-- These files are a local draft. Edge fits, several concurrency counts and the final engine commit remain unqualified.
+- Added prebuilt Linux TensorFold archives and a three-step install.
+- Updated the card configs and calculator to account for TensorFold's CUDA memory reserve.
+- Capped the recommended concurrency using the release guidance and measured throughput.
+- Linked measured speed to the hardware, model branch and request count used in each test.
+- Sized every config with TensorFold's planner (`tensorfold-native plan`), checked against real servers at the edge; the calculator now wraps the planner.
+- Raised DGX Spark to eight requests; the 16 GB configs start with a 0.5 GiB engine reserve.

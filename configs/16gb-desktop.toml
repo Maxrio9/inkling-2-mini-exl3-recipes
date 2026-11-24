@@ -1,6 +1,8 @@
-# Pass the downloaded model directory on the command line.
-# Context includes input and output, per request.
-context = 45056
+# Model branch: 3.3bpw. Pass its downloaded directory to serve.
+# Start with TENSORFOLD_MEMORY_RESERVE_GIB=0.5 set.
+# Leaves 1 GiB for the desktop session on this GPU.
+# Context per request includes input and output; sized by tensorfold-native plan.
+context = 41984
 parallel = 1
 kv-cache = "fp8"
 prompt-cache-gib = 0

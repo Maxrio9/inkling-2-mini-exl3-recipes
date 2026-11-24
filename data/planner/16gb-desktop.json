@@ -1,0 +1,291 @@
+{
+  "model": "3.3bpw",
+  "unified": false,
+  "parallel": 1,
+  "kv_cache": "fp8",
+  "drafts": false,
+  "model_cap": 1048576,
+  "maximum": 42048,
+  "rounded_down": 41984,
+  "model_cap_binds": false,
+  "memory": {
+    "total": {
+      "bytes": 17094934528,
+      "gib": 15.9208984375
+    },
+    "startup_free": {
+      "bytes": 15669919744,
+      "gib": 14.59375
+    },
+    "driver_allowance": {
+      "bytes": 351272960,
+      "gib": 0.3271484375
+    },
+    "desktop_allowance": {
+      "bytes": 1073741824,
+      "gib": 1
+    },
+    "reserve": {
+      "bytes": 536870912,
+      "gib": 0.5
+    },
+    "limit": null
+  },
+  "result": {
+    "context": 42048,
+    "admitted": true,
+    "refused_at": null,
+    "message": null,
+    "components": {
+      "target_weights": {
+        "bytes": 12429923328,
+        "gib": 11.576268196105957
+      },
+      "drafter_weights_and_padding": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_prepared_head": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "dense_scratch": {
+        "bytes": 7078656,
+        "gib": 0.006592512130737305
+      },
+      "model_working": {
+        "bytes": 1689860480,
+        "gib": 1.5738052129745483
+      },
+      "backend_shared": {
+        "bytes": 6406480,
+        "gib": 0.005966499447822571
+      },
+      "drafter_shared_other": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_shared_taps": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_attention_partials": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "target_global_kv": {
+        "bytes": 710443008,
+        "gib": 0.661651611328125
+      },
+      "target_local_kv": {
+        "bytes": 259522560,
+        "gib": 0.24169921875
+      },
+      "target_conv": {
+        "bytes": 3833856,
+        "gib": 0.003570556640625
+      },
+      "target_rewind": {
+        "bytes": 24287232,
+        "gib": 0.022619247436523438
+      },
+      "backend_lane": {
+        "bytes": 800264,
+        "gib": 0.0007453039288520813
+      },
+      "drafter_kv": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_pending_taps": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_newest": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "global_kv_per_token": {
+        "bytes": 16896,
+        "gib": 1.5735626220703125e-05
+      }
+    },
+    "tracked": {
+      "weights_check": {
+        "bytes": 12429923328,
+        "gib": 11.576268196105957
+      },
+      "first_stream_state": {
+        "bytes": 2702232536,
+        "gib": 2.5166501626372337
+      },
+      "model": {
+        "bytes": 15132155864,
+        "gib": 14.09291835874319
+      },
+      "per_stream": {
+        "bytes": 998886920,
+        "gib": 0.9302859380841255
+      },
+      "extra_streams": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "ready": {
+        "bytes": 15132155864,
+        "gib": 14.09291835874319
+      }
+    },
+    "rooms": {
+      "weights": {
+        "bytes": 15133048832,
+        "gib": 14.09375
+      },
+      "first_stream_state": {
+        "bytes": 2703125504,
+        "gib": 2.517481803894043
+      },
+      "after_model": {
+        "bytes": 892968,
+        "gib": 0.0008316412568092346
+      },
+      "after_staging": {
+        "bytes": 892968,
+        "gib": 0.0008316412568092346
+      },
+      "extra_streams": {
+        "bytes": 892968,
+        "gib": 0.0008316412568092346
+      },
+      "after_streams": {
+        "bytes": 892968,
+        "gib": 0.0008316412568092346
+      },
+      "prompt_cache_budget": {
+        "bytes": 892968,
+        "gib": 0.0008316412568092346
+      }
+    }
+  },
+  "next_context": {
+    "context": 42049,
+    "admitted": false,
+    "refused_at": "first_stream_state",
+    "message": "the CUDA memory budget cannot fit Mini\u2019s working state and KV cache: lower --context or free device memory",
+    "components": {
+      "target_weights": {
+        "bytes": 12429923328,
+        "gib": 11.576268196105957
+      },
+      "drafter_weights_and_padding": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_prepared_head": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "dense_scratch": {
+        "bytes": 7078656,
+        "gib": 0.006592512130737305
+      },
+      "model_working": {
+        "bytes": 1689860480,
+        "gib": 1.5738052129745483
+      },
+      "backend_shared": {
+        "bytes": 6406480,
+        "gib": 0.005966499447822571
+      },
+      "drafter_shared_other": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_shared_taps": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_attention_partials": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "target_global_kv": {
+        "bytes": 711524352,
+        "gib": 0.66265869140625
+      },
+      "target_local_kv": {
+        "bytes": 259522560,
+        "gib": 0.24169921875
+      },
+      "target_conv": {
+        "bytes": 3833856,
+        "gib": 0.003570556640625
+      },
+      "target_rewind": {
+        "bytes": 24287232,
+        "gib": 0.022619247436523438
+      },
+      "backend_lane": {
+        "bytes": 800264,
+        "gib": 0.0007453039288520813
+      },
+      "drafter_kv": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_pending_taps": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "drafter_newest": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "global_kv_per_token": {
+        "bytes": 16896,
+        "gib": 1.5735626220703125e-05
+      }
+    },
+    "tracked": {
+      "weights_check": {
+        "bytes": 12429923328,
+        "gib": 11.576268196105957
+      },
+      "first_stream_state": {
+        "bytes": 2703313880,
+        "gib": 2.5176572427153587
+      },
+      "model": {
+        "bytes": 15133237208,
+        "gib": 14.093925438821316
+      },
+      "per_stream": {
+        "bytes": 999968264,
+        "gib": 0.9312930181622505
+      },
+      "extra_streams": {
+        "bytes": 0,
+        "gib": 0
+      },
+      "ready": {
+        "bytes": 15133237208,
+        "gib": 14.093925438821316
+      }
+    },
+    "rooms": {
+      "weights": {
+        "bytes": 15133048832,
+        "gib": 14.09375
+      },
+      "first_stream_state": {
+        "bytes": 2703125504,
+        "gib": 2.517481803894043
+      },
+      "after_model": null,
+      "after_staging": null,
+      "extra_streams": null,
+      "after_streams": null,
+      "prompt_cache_budget": null
+    }
+  }
+}
