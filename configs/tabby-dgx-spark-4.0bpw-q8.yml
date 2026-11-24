@@ -1,0 +1,18 @@
+# Q8 context is a memory projection; edge has not been tested.
+network:
+  api_servers: [oai]
+
+model:
+  model_name: 4.0bpw
+  max_seq_len: 1048576
+  cache_size: 1048576
+  cache_mode: Q8
+  chunk_size: 2048
+  recurrent_checkpoint_interval_pp: 2048
+  warmup: true
+  max_batch_size: 1
+  vision: false
+  template_vars_default: {reasoning_effort: none}
+
+draft_model:
+  draft_mode: disabled
