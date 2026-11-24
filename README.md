@@ -19,9 +19,17 @@ Use the desktop row if this GPU also drives your display. Context is per request
 | DGX Spark | `4.0bpw` | 8 | 544,768 | On | default | [Config](configs/dgx-spark.toml) |
 | DGX Spark, desktop | `4.0bpw` | 8 | 538,624 | On | default | [Desktop](configs/dgx-spark-desktop.toml) |
 
-The request counts keep a long context per request. We timed up to eight concurrent requests on the RTX PRO 4500 and four on DGX Spark, where eight is a cap until a larger run exists. More requests fit at the cost of context per request; size them with the calculator below. A 16 GB card with DSpark on holds one request of about 46k tokens; for longer prompts use the long-context row. The desktop rows leave 1 GiB for the display session. If yours uses more (check `nvidia-smi` before starting), lower `context`.
+The request counts keep a long context per request. We timed up to eight concurrent requests on the RTX PRO 4500 and four on DGX Spark, where eight is a cap until a larger run exists. More requests fit at the cost of context per request; size them with the calculator below. A 16 GB card with DSpark on holds one request of about 46k tokens; for longer prompts use the long-context row. The desktop rows leave 1 GiB for the display session. The launcher checks free memory at startup and lowers context if needed.
 
 ## Install
+
+1. `git clone https://github.com/Maxrio9/inkling-2-mini-exl3-recipes.git`
+2. `cd inkling-2-mini-exl3-recipes && ./start.sh`
+3. Once the server is ready, open [the model endpoint](http://127.0.0.1:8080/v1/models).
+
+The launcher uses Linux, Python 3.11 or newer, and the NVIDIA driver. Run `./start.sh` each time to check for updates and start the server. `./start.sh --dry-run` shows the selected recipe. To start offline, supply both `--engine-archive FILE` and `--model-dir DIR`. Run `./start.sh --help` for card, display, and model overrides. Pass TensorFold flags after `--`, as in `./start.sh -- --port 8081`.
+
+### Manual install
 
 You need Linux with glibc 2.28 or newer, an NVIDIA driver that supports your GPU and CUDA 13, and the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli).
 
@@ -58,11 +66,11 @@ Install Zig 0.17.0 and a CUDA toolkit with `nvcc` that supports your GPU. The ar
 ```sh
 git clone --branch inkling2-mini-exl3 https://github.com/Maxrio9/TensorFold.git
 cd TensorFold
-git checkout 70d6031b52d158e0ce21eb4b54f454ce714370e8
+git checkout 664053f8f7cc9132985fc749bd3261519511b536
 zig build -Dgpu=sm_120 -Dnvcc="$(command -v nvcc)"
 ```
 
-Use `zig-out/native/bin/tensorfold-native` in step 3. [TensorFold runbook](https://github.com/Maxrio9/TensorFold/blob/70d6031b52d158e0ce21eb4b54f454ce714370e8/RUNBOOK.md)
+Use `zig-out/native/bin/tensorfold-native` in step 3. [TensorFold runbook](https://github.com/Maxrio9/TensorFold/blob/664053f8f7cc9132985fc749bd3261519511b536/RUNBOOK.md)
 
 ## Speed you can expect
 
@@ -113,7 +121,7 @@ These contributors supplied upstream work used in the port.
 | `--host HOST`, `--port PORT` | Set the listen address and port. |
 | `--name NAME` | Sets the model ID clients use. |
 
-Schema-constrained replies and required tool calls need the optional grammar library. [Build instructions](https://github.com/Maxrio9/TensorFold/blob/70d6031b52d158e0ce21eb4b54f454ce714370e8/RUNBOOK.md)
+The release archives include the grammar library. Tool calling works (the model picks tools with `tool_choice` "auto", and multi-turn tool results are handled). Forcing a tool (`tool_choice` "required") and schema-constrained replies (`response_format` json_schema) are not supported yet on the Inkling 2 Mini CUDA backend. [Source build instructions](https://github.com/Maxrio9/TensorFold/blob/664053f8f7cc9132985fc749bd3261519511b536/RUNBOOK.md)
 
 ### Make your own config
 
@@ -134,10 +142,10 @@ python3 tools/recipes.py --card 24 --parallel 3 --model ./inkling-mini > recipe.
 | `--reserve-gib R` | Sets the engine reserve, as `TENSORFOLD_MEMORY_RESERVE_GIB` would. |
 | `--binary PATH`, `--json` | Picks the engine binary; prints the planner's full report with bytes per component. |
 
-The planner itself takes the card's memory directly, for any card:
+Use `tensorfold-native plan` to check a specific context against available memory. For this 24 GB example, supply the free MiB available at CUDA startup:
 
 ```sh
-./bin/tensorfold-native plan ./inkling-mini --device-mib 24564 --parallel 2
+./bin/tensorfold-native plan ./inkling-mini --device-mib 24564 --free-mib 24229 --parallel 2 --context 151552
 ```
 
 See the [measurement settings, results and memory model](data/MEASUREMENTS.md).
