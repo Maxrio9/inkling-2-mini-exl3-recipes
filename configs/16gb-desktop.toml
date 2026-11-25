@@ -1,8 +1,9 @@
 # Model branch: 3.3bpw. Pass its downloaded directory to serve.
 # Start with TENSORFOLD_MEMORY_RESERVE_GIB=0.5 set.
+# Start with TF_INKLING2_LAZY_HEAD=0 set.
 # Leaves 1 GiB for the desktop session on this GPU.
 # Context per request includes input and output; sized by tensorfold-native plan.
-context = 41984
+context = 40960
 parallel = 1
 kv-cache = "fp8"
 prompt-cache-gib = 0

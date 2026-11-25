@@ -1,5 +1,22 @@
 # TensorFold measurements
 
+## RC1 configuration sizing
+
+The [planner receipts](planner/) use the integrated rc1 planner, staged 3.3bpw and 4.0bpw target headers, and the FP8 DFlash2 package. Each receipt has the unconstrained admission boundary in `maximum` and the selected config's fixed-window capacity report in `recipe.result`. The latter includes budget for the cache after the model and every request slot. On 16 GB desktop, the planner admitted 13,632 tokens with the lazy head and 40,960 with the plain head, using a 1 GiB display allowance and a 0.5 GiB engine reserve. The default presets are text-only. Each 24 GB, 32 GB and Spark profile has a separate vision preset with the same stream count. The 24 GB desktop pair uses one stream because the two-stream vision plan leaves 1.38 GiB for prompt caching at the 65,536-token floor. The planner reserves 2 GiB for prompt cache on 24 GB and 32 GB cards and 8 GiB on Spark. Both Spark vision rows still exceed 580,000 tokens per request.
+
+## RC1 desktop IFBench
+
+RTX PRO 4500 with identical staged 3.3bpw target weights and FP8 DFlash2 layers and head. All 300 items used seed 0, default high reasoning effort, a 33,792-token window, six streams, temperature 1.0, top-p 0.95, top-k 20 and a 32,768-token completion cap. Prompt caching was disabled. After the desktop changed from graphical to compute mode, the FP8 arm resumed from 177 completed items with the same generation policy. Aggregate output rates include request scheduling and prefill and use active time from each arm.
+
+| Target KV | Loose | Strict | Output caps | Mean completion tokens | Median request time | Aggregate output tok/s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| BF16 | 217/300 (72.33%) | 209/300 (69.67%) | 11 | 5,603.8 | 85.67 s | 181.95 |
+| FP8 | 219/300 (73.00%) | 212/300 (70.67%) | 9 | 5,308.7 | 93.98 s | 175.98 |
+
+The paired FP8-minus-BF16 difference was +0.67 percentage points on the loose score (95% bootstrap interval -3.67 to +5.00) and +1.00 points on the strict score (95% interval -3.67 to +5.33). Neither score detected a loss. Both arms completed every item with reasoning present and zero request or grader errors. The capped responses had empty final answers and remain in the primary comparison. Excluding the 18 items capped by either arm gave 0.00 percentage points on the loose measure across 282 pairs (95% interval -4.26 to +4.26).
+
+## S1–S6 development measurements
+
 Slices S1–S6 used development builds of TensorFold leading to commit `70d6031b52d158e0ce21eb4b54f454ce714370e8` on `inkling2-mini-exl3`. S1 was based on `42bbc8e35`, S4 on `a1c1f8d53` and S6 on `cb54db840`. The release archive was checked with a short served request on RTX PRO 4500. RTX PRO 4500 Blackwell used sm_120 and NVIDIA driver 615.78.08. DGX Spark GB10 used sm_121 and driver 595.99.02. The benchmark builds used Zig 0.17.0 and CUDA nvcc 13.4.92. Decode rates exclude the first generated token.
 
 ## S1: initial server
@@ -76,9 +93,9 @@ Both machines used the S5 prompts, 8,192 input tokens, 400 output tokens, greedy
 
 The Spark c=4 delivery aggregate was 26.07 tok/s. All 144 desktop and 24 Spark timed completions matched their corresponding target token IDs. A single Spark retrieval test with a 262,144-token prompt and 227 output tokens returned 5/5 facts, cold TTFT 512.36 s. Spark peak process RSS was 29.37 GiB at 8,704 × 4 and 29.49 GiB at 262,656 × 1; minimum system available memory was 97.67 and 93.15 GiB respectively. These RSS figures include loading and measure process memory on the unified-memory Spark.
 
-## Capacity: TensorFold's planner
+## Original planner validation
 
-Every config's context comes from `tensorfold-native plan`, recorded per config in [planner/](planner/). The planner reads the model branch's checkpoint headers and runs the engine's own sizing and startup admission without a GPU: target and drafter weights, working buffers, KV cache and per-request state, then the weight, first-request and parallel-request checks the server makes at startup. It reports bytes per component and the largest admitted context per request.
+The planner reads the model branch's checkpoint headers and runs the engine's sizing and startup admission without a GPU. This validation used the original recipe settings and verifies the planner against live startup before the DFlash2 and vision update.
 
 | Planner input | Value |
 |---|---|

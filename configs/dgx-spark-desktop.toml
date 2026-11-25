@@ -1,7 +1,7 @@
 # Model branch: 4.0bpw. Pass its downloaded directory to serve.
 # Leaves 1 GiB for the desktop session on this GPU.
 # Context per request includes input and output; sized by tensorfold-native plan.
-context = 538624
+context = 602112
 parallel = 8
 kv-cache = "fp8"
-prompt-cache-gib = 0
+prompt-cache-gib = 8
