@@ -4,26 +4,20 @@ These TensorFold rc1 recipes run Inkling 2 Mini locally on NVIDIA GPUs through a
 
 ## Pick your card
 
-Use the desktop row if this GPU also drives your display. Context includes both the prompt and the reply. Each row comes from TensorFold's planner using the target and the packed DFlash2 checkpoint. [Planner receipts](data/planner)
+Use the desktop row if this GPU also drives your display. The KV pool is the total number of tokens the card holds in its KV cache across all parallel requests, prompt and reply included. Each request gets an equal slot of the pool: divide by the number of parallel requests for the longest single conversation. All rows use FP8 KV. The vision column is the pool when image input is enabled with `--vision`. Each row comes from TensorFold's planner using the target and the packed DFlash2 checkpoint. [Planner receipts](data/planner)
 
-| GPU memory | Model branch | KV | Parallel requests | Tokens per request | DFlash2 | Vision | Prompt cache | Config |
-|---|---|---|---:|---:|---|---|---:|---|
-| 12 GB | No fit | — | — | — | — | — | — | — |
-| 16 GB | `3.3bpw` | FP8 | 1 | 39,936 | On | Off | 0 GiB | [Config](configs/16gb.toml) |
-| 16 GB, desktop | `3.3bpw` | FP8 | 1 | 40,960 | Off | Off | 0 GiB | [Config](configs/16gb-desktop.toml) |
-| 16 GB, long context | `3.3bpw` | FP8 | 1 | 76,800 | Off | Off | 0 GiB | [Config](configs/16gb-long.toml) |
-| 24 GB | `4.0bpw` | FP8 | 2 | 116,736 | On | Off | 2 GiB | [Config](configs/24gb.toml) |
-| 24 GB, vision | `4.0bpw` | FP8 | 2 | 76,800 | On | On | 2 GiB | [Config](configs/24gb-vision.toml) |
-| 24 GB, desktop | `4.0bpw` | FP8 | 1 | 184,320 | On | Off | 2 GiB | [Config](configs/24gb-desktop.toml) |
-| 24 GB, desktop, vision | `4.0bpw` | FP8 | 1 | 108,544 | On | On | 2 GiB | [Config](configs/24gb-desktop-vision.toml) |
-| 32 GB | `4.0bpw` | FP8 | 4 | 172,032 | On | Off | 2 GiB | [Config](configs/32gb.toml) |
-| 32 GB, vision | `4.0bpw` | FP8 | 4 | 150,528 | On | On | 2 GiB | [Config](configs/32gb-vision.toml) |
-| 32 GB, desktop | `4.0bpw` | FP8 | 4 | 156,672 | On | Off | 2 GiB | [Config](configs/32gb-desktop.toml) |
-| 32 GB, desktop, vision | `4.0bpw` | FP8 | 4 | 135,168 | On | On | 2 GiB | [Config](configs/32gb-desktop-vision.toml) |
-| DGX Spark | `4.0bpw` | FP8 | 8 | 609,280 | On | Off | 8 GiB | [Config](configs/dgx-spark.toml) |
-| DGX Spark, vision | `4.0bpw` | FP8 | 8 | 598,016 | On | On | 8 GiB | [Config](configs/dgx-spark-vision.toml) |
-| DGX Spark, desktop | `4.0bpw` | FP8 | 8 | 602,112 | On | Off | 8 GiB | [Config](configs/dgx-spark-desktop.toml) |
-| DGX Spark, desktop, vision | `4.0bpw` | FP8 | 8 | 589,824 | On | On | 8 GiB | [Config](configs/dgx-spark-desktop-vision.toml) |
+| GPU memory | Model branch | Parallel requests | KV pool, text | KV pool, with vision | DFlash2 | Prompt cache | Configs |
+|---|---|---:|---:|---:|---|---:|---|
+| 12 GB | No fit | — | — | — | — | — | — |
+| 16 GB | `3.3bpw` | 1 | 39,936 | — | On | 0 GiB | [Text](configs/16gb.toml) |
+| 16 GB, desktop | `3.3bpw` | 1 | 40,960 | — | Off | 0 GiB | [Text](configs/16gb-desktop.toml) |
+| 16 GB, long context | `3.3bpw` | 1 | 76,800 | — | Off | 0 GiB | [Text](configs/16gb-long.toml) |
+| 24 GB | `4.0bpw` | 2 | 233,472 | 153,600 | On | 2 GiB | [Text](configs/24gb.toml) · [Vision](configs/24gb-vision.toml) |
+| 24 GB, desktop | `4.0bpw` | 1 | 184,320 | 108,544 | On | 2 GiB | [Text](configs/24gb-desktop.toml) · [Vision](configs/24gb-desktop-vision.toml) |
+| 32 GB | `4.0bpw` | 4 | 688,128 | 602,112 | On | 2 GiB | [Text](configs/32gb.toml) · [Vision](configs/32gb-vision.toml) |
+| 32 GB, desktop | `4.0bpw` | 4 | 626,688 | 540,672 | On | 2 GiB | [Text](configs/32gb-desktop.toml) · [Vision](configs/32gb-desktop-vision.toml) |
+| DGX Spark | `4.0bpw` | 8 | 4,874,240 | 4,784,128 | On | 8 GiB | [Text](configs/dgx-spark.toml) · [Vision](configs/dgx-spark-vision.toml) |
+| DGX Spark, desktop | `4.0bpw` | 8 | 4,816,896 | 4,718,592 | On | 8 GiB | [Text](configs/dgx-spark-desktop.toml) · [Vision](configs/dgx-spark-desktop-vision.toml) |
 
 The desktop rows leave 1 GiB for the display session. All 16 GB rows use a 0.5 GiB engine reserve. The headless 16 GB default uses DFlash2. The 16 GB desktop recipe uses plain decode and disables the lazy-head proxy to fit its 40,960-token window. Use the 16 GB long-context row for longer documents.
 
@@ -38,7 +32,7 @@ The planner keeps at least 65,536 tokens per request in every cached preset. It 
 
 The launcher uses Linux, Python 3.11 or newer, and the NVIDIA driver. Use the prepared local archive for rc1. `./start.sh --dry-run` shows the selected recipe. Add `--vision` before `--` to select the matching vision preset on a 24 GB or larger card. To start offline, supply `--engine-archive FILE` and `--model-dir DIR`. Drafted recipes also need a verified `dflash2/` bundle in that model directory or `-- --drafter DIR`. Run `./start.sh --help` for card, display, and model overrides. Pass TensorFold flags after `--`, as in `./start.sh -- --port 8081`.
 
-On Blackwell, the launcher checks the model repository's `dflash2-fp8` branch and verifies `SHA256SUMS` before installing the bundle. If the package is absent, it downloads Inco AI's pinned BF16 checkpoint and checks each file against a pinned SHA-256 digest. Older GPUs use that BF16 checkpoint directly. The launcher exposes the verified bundle under the model's `dflash2/` path and uses it for both planning and serving.
+On Blackwell, the launcher checks the 8-bit drafter repository [Maxrio/Inkling-2-Mini-DFlash2-FP8](https://huggingface.co/Maxrio/Inkling-2-Mini-DFlash2-FP8) and verifies `SHA256SUMS` before installing the bundle. If the package is absent, it downloads Inco AI's pinned BF16 checkpoint and checks each file against a pinned SHA-256 digest. Older GPUs use that BF16 checkpoint directly. The launcher exposes the verified bundle under the model's `dflash2/` path and uses it for both planning and serving.
 
 The vision presets need the CUDA 13 cuBLAS runtime so TensorFold can find `libcublasLt.so.13`. PNG input uses the built-in decoder. JPEG and WebP input need the matching libraries listed in the archive's `RUNTIME.md`.
 

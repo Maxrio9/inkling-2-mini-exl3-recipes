@@ -8,7 +8,7 @@ release_api=https://api.github.com/repos/Maxrio9/TensorFold/releases
 base_tag=inkling2-mini-exl3-v2
 source_pin=${INKLING_TENSORFOLD_SOURCE_PIN:-}
 model_repo=Maxrio/Inkling-2-Mini-exl3
-drafter_branch=dflash2-fp8
+drafter_repo=Maxrio/Inkling-2-Mini-DFlash2-FP8
 drafter_upstream=incoai/Inkling-2-Mini-DFlash2
 drafter_upstream_pin=4f9088ea66c21f2b99ed657d1941c306b03e84d2
 original=("$@")
@@ -402,7 +402,7 @@ install_drafter() {
     local origin='' status cache_key bundle file
     mkdir -p -- "$cache/drafters" "$stage/draft"
     if ((${capability/./} >= 120)); then
-        origin=https://huggingface.co/$model_repo/resolve/$drafter_branch
+        origin=https://huggingface.co/$drafter_repo/resolve/main
         if ! status=$(fetch "$origin/SHA256SUMS" -o "$stage/draft/SHA256SUMS" -w '%{http_code}' 2>"$stage/draft-fetch-error"); then
             if [[ $status != 404 ]]; then
                 cat "$stage/draft-fetch-error" >&2
