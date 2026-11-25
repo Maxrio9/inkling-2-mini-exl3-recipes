@@ -444,7 +444,8 @@ SUMS
 if ! $no_drafts && [[ ! $drafter ]]; then
     drafter=$model_dir/dflash2
     drafter_link=$(readlink -- "$drafter" || true)
-    if $managed_model && { [[ ! -e $drafter && ! -L $drafter ]] || [[ $drafter_link == "$cache/drafters/"* ]]; }; then
+    # Offline (local engine archive and model) uses only a drafter already in place; otherwise install it.
+    if { $managed_model || [[ ! $engine_archive ]]; } && { [[ ! -e $drafter && ! -L $drafter ]] || [[ $drafter_link == "$cache/drafters/"* ]]; }; then
         install_drafter
     else
         [[ -d $drafter ]] || die "DFlash2 bundle missing at $drafter. Supply -- --drafter DIR or use --no-drafts."
