@@ -34,7 +34,7 @@ def planner_args(card, desktop, parallel, drafts, kv, reserve_gib, drafter=None,
     c = CARDS[card]
     args = ['--device-mib', str(c['device_mib']), '--parallel', str(parallel), '--kv-cache', kv]
     if c['unified']:
-        args.append('--unified')
+        args += ['--unified', '--compute-capability', '121']
     if 'free_mib' in c:
         # Spark: the measured free memory already excludes the system; the desktop allowance comes off it.
         free = c['free_mib'] - (int(DESKTOP_GIB * 1024) if desktop else 0)
@@ -98,19 +98,24 @@ def run_planner(command, context=None):
     if result['admitted']:
         if 'pool_tokens' not in result:
             sys.exit('The engine planner must report shared KV pool capacity. Use the paged Mini archive.')
-        if result.get('snapshot_slots') != 0 or result.get('tracked', {}).get('snapshot_bytes', {}).get('bytes') != 0:
-            sys.exit('Use the paged Mini planner that stores retained prompt state in the shared KV pool.')
+        retention = result.get('prefix_retention')
+        if not isinstance(retention, dict) or not all(
+            type(retention.get(key)) is int and retention[key] >= 0 for key in ('pages', 'bytes', 'marks')
+        ):
+            sys.exit('Use the paged Mini planner that reports prefix-retention limits.')
     return report
 
 
 def startup(args):
     requested, *command = args
-    requested = int(requested)
     if requested:
-        result = run_planner(command, requested)['result']
+        context = int(requested)
+        result = run_planner(command, context)['result']
         if result['admitted']:
             print(result['context'], result['pool_tokens'])
             return
+        if context == 0:
+            sys.exit(result['message'] or 'The full model window does not fit')
     report = run_planner(command)
     if not report['maximum']:
         sys.exit(report['result']['message'] or 'No usable context fits')

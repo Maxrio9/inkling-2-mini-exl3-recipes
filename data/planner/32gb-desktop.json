@@ -1,5 +1,6 @@
 {
   "model": "4.0bpw",
+  "compute_capability": 120,
   "unified": false,
   "parallel": 4,
   "kv_cache": "fp8",
@@ -36,7 +37,11 @@
     "context": 704496,
     "pool_tokens": 705280,
     "fixed_bytes_per_stream": 331131144,
-    "snapshot_slots": 0,
+    "prefix_retention": {
+      "pages": 2755,
+      "bytes": 11916410880,
+      "marks": 64
+    },
     "admitted": true,
     "refused_at": null,
     "message": null,
@@ -141,10 +146,6 @@
       "extra_streams": {
         "bytes": 993393432,
         "gib": 0.9251697286963463
-      },
-      "snapshot_bytes": {
-        "bytes": 0,
-        "gib": 0
       },
       "ready": {
         "bytes": 31689792052,
@@ -287,7 +288,11 @@
       "context": 703488,
       "pool_tokens": 705280,
       "fixed_bytes_per_stream": 331131132,
-      "snapshot_slots": 0,
+      "prefix_retention": {
+        "pages": 2755,
+        "bytes": 11916410880,
+        "marks": 64
+      },
       "admitted": true,
       "refused_at": null,
       "message": null,
@@ -392,10 +397,6 @@
         "extra_streams": {
           "bytes": 993393396,
           "gib": 0.9251696951687336
-        },
-        "snapshot_bytes": {
-          "bytes": 0,
-          "gib": 0
         },
         "ready": {
           "bytes": 31689792004,

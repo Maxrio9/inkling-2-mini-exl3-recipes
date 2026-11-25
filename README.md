@@ -50,7 +50,7 @@ You need Linux with glibc 2.28 or newer, an NVIDIA driver that supports your GPU
    cd tensorfold-1.3.4-linux-x86_64
    ```
 
-   On DGX Spark, use the folder ending in `linux-aarch64`. The shared-pool presets apply to sm_120 and sm_121. The x86_64 archive also includes the legacy CUDA path for sm_86 and sm_89. On those GPUs, set a context you have checked for the chosen stream count with `./start.sh -- --context N` or supply your own config.
+   On DGX Spark, use the folder ending in `linux-aarch64`. The shared-pool presets apply to every CUDA target in the archives. The launcher checks current memory using the selected drafter and reduces the preset’s request cap if needed. On RTX 30 and 40 series, it plans with the BF16 drafter and the plain output head.
 
 2. **Download the model branch for your GPU.** This command uses the 24 GB example. Use the launcher to install the matching drafter, or place a verified DFlash2 bundle in `inkling-mini/dflash2`.
 
@@ -163,7 +163,7 @@ These contributors supplied upstream work used in the port.
 | Serve flag | What it does |
 |---|---|
 | `--config FILE` | Reads a TOML config. Command-line values override the file. |
-| `--context N` | Sets the prompt-plus-output limit for each request. |
+| `--context N` | Sets the prompt-plus-output limit for each request. Omit it from a custom config for automatic sizing. A value of `0` requests the full model window and requires enough memory for it. |
 | `--parallel N` | Sets the concurrency limit. The model supports up to 16 requests sharing the pool. |
 | `--kv-cache fp8\|bf16` | Sets the target KV cache format. BF16 uses more memory. |
 | `--no-drafts` | Runs plain decoding. Remove `no-drafts = true` from the file to enable drafts. |

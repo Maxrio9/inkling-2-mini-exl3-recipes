@@ -79,7 +79,7 @@ class RecipeTest(unittest.TestCase):
                           '--desktop-reserve-gib', '1.0', '--reserve-gib', '0.5', '--no-drafts'])
         self.assertEqual(planner_args('spark', True, 8, True, 'fp8', None),
                          ['--device-mib', '124608', '--parallel', '8', '--kv-cache', 'fp8',
-                          '--unified', '--free-mib', '118256'])
+                          '--unified', '--compute-capability', '121', '--free-mib', '118256'])
         self.assertEqual(planner_args('24', False, 2, True, 'fp8', None, './draft', True),
                          ['--device-mib', '24564', '--parallel', '2', '--kv-cache', 'fp8',
                           '--drafter', './draft', '--vision'])
@@ -91,17 +91,21 @@ class RecipeTest(unittest.TestCase):
                   'recipe': {'context': 32768, 'prompt_cache_gib': 1.5}}
         self.assertEqual(tomllib.loads(toml(report, '32', False, None, '4.0bpw', 'fp8'))['prompt-cache-gib'], 1.5)
 
-    def test_planner_requires_shared_pool_state_for_admitted_results(self):
-        for pool, slots, snapshot_bytes in [(True, 0, 0), (True, 2, 1024), (True, 0, 1024), (False, 0, 0)]:
-            with self.subTest(pool=pool, slots=slots, snapshot_bytes=snapshot_bytes):
-                result = {'admitted': True, 'snapshot_slots': slots,
-                          'tracked': {'snapshot_bytes': {'bytes': snapshot_bytes}}}
+    def test_planner_requires_shared_pool_retention_limits_for_admitted_results(self):
+        valid = {'pages': 64, 'bytes': 4096, 'marks': 8}
+        disabled = {'pages': 0, 'bytes': 0, 'marks': 0}
+        for pool, retention in (
+            (True, valid), (True, disabled), (False, valid), (True, None),
+            (True, {'pages': 64}), (True, {**valid, 'marks': -1}),
+        ):
+            with self.subTest(pool=pool, retention=retention):
+                result = {'admitted': True, 'prefix_retention': retention}
                 if pool:
                     result['pool_tokens'] = 16384
                 cmd = ['planner']
                 output = CompletedProcess(cmd, 0, json.dumps({'result': result}), '')
                 with patch('recipes.subprocess.run', return_value=output):
-                    if pool and slots == snapshot_bytes == 0:
+                    if pool and retention in (valid, disabled):
                         self.assertEqual(run_planner(cmd)['result'], result)
                     else:
                         with self.assertRaises(SystemExit):
@@ -124,12 +128,28 @@ class RecipeTest(unittest.TestCase):
         self.assertEqual([call.args for call in run.call_args_list], [(['planner'], 32768), (['planner'],)])
         self.assertEqual(output.getvalue(), '16368 16384\n')
 
+    def test_startup_refuses_explicit_zero_when_the_full_window_does_not_fit(self):
+        refused = {'result': {'admitted': False, 'message': 'full model window exceeds capacity'}}
+        with patch('recipes.run_planner', return_value=refused) as run:
+            with self.assertRaisesRegex(SystemExit, 'full model window exceeds capacity'):
+                startup(['0', 'planner'])
+        run.assert_called_once_with(['planner'], 0)
+
+    def test_startup_uses_automatic_sizing_when_context_is_omitted(self):
+        automatic = {'maximum': 16368, 'result': {'admitted': True, 'context': 16368, 'pool_tokens': 16384}}
+        with patch('recipes.run_planner', return_value=automatic) as run, contextlib.redirect_stdout(io.StringIO()) as output:
+            startup(['', 'planner'])
+        run.assert_called_once_with(['planner'])
+        self.assertEqual(output.getvalue(), '16368 16384\n')
+
     def test_card_context_cache_and_vision(self):
         for name, (card, _, _, vision, _) in SHIPPED.items():
             recipe = self.report(name)['recipe']
             self.assertGreaterEqual(recipe['context'], 8192, name)
-            self.assertEqual(recipe['result']['snapshot_slots'], 0, name)
-            self.assertEqual(recipe['result']['tracked']['snapshot_bytes']['bytes'], 0, name)
+            retention = recipe['result']['prefix_retention']
+            self.assertEqual(retention['pages'] * 256, recipe['result']['pool_tokens'], name)
+            self.assertEqual(retention['bytes'], recipe['result']['components']['target_global_kv']['bytes'], name)
+            self.assertGreater(retention['marks'], 0, name)
             self.assertNotIn('prompt_cache_gib', recipe, name)
             if card == '16':
                 self.assertFalse(recipe['vision'], name)

@@ -2,11 +2,17 @@
 
 ## Paged CUDA release candidate
 
-The [planner receipts](planner/) report the shared global KV pool, per-request context cap and fixed bytes per stream. Prefix retention takes pages on demand from that pool for both the global KV rows and restart state. The planner reports zero reserved snapshot slots and zero snapshot bytes. All 15 recipes use the same 3.3 bpw and 4.0 bpw checkpoint headers and FP8 DFlash2 bundle as the earlier build. The 24 GB, 32 GB and Spark recipes plan for 2, 4 and 8 requests, with the same counts for text and vision.
+The [planner receipts](planner/) report the shared global KV pool, per-request context cap and fixed bytes per stream. Prefix retention takes pages on demand from that pool for both the global KV rows and restart state. The planner reports the effective limit in retained pages, bytes and marks. Restart state has no reserved allocation. All 15 recipes use the same 3.3 bpw and 4.0 bpw checkpoint headers and FP8 DFlash2 bundle as the earlier build. The 24 GB, 32 GB and Spark recipes plan for 2, 4 and 8 requests, with the same counts for text and vision.
 
 The 16 GB headless recipe admits DFlash2 with a 40,192-token global pool and a 39,936-token per-request cap. The planner accounts for 16,194,582,160 device bytes under the existing 0.5 GiB reserve. Default caching, `TF_KV_SHARE=0`, `--prompt-cache-gib 0`, and a 0.2 GiB retention cap all give the same capacity and allocation. With the additional 1 GiB display allowance, DFlash2 exceeds the startup budget even with the plain head. The desktop preset keeps plain decoding and the plain head.
 
 On the RTX PRO 4500 with a 15.09375 GiB engine cap and 0.5 GiB reserve, the final release binary matched the 16 GB planner's 16,194,582,160 tracked bytes. The GPU process was sampled at 15,786 MiB. It served 8,192 input tokens and 400 output tokens. DFlash2 accepted 318 of 505 proposals in 81 rounds. The engine retained the prompt at its cache mark in 62 pool pages.
+
+### RTX 4090 launcher memory check
+
+The live launcher used a simulated RTX 4090 memory reading of 24,564 MiB total and 24,000 MiB free. The real planner read the 4.0 bpw checkpoint headers and the SHA-256-verified, pinned BF16 DFlash2 bundle at compute capability 89. With 23,665 MiB effective free, it reduced the 24 GB preset’s cap from 340,992 to 309,744 tokens. It admitted two requests sharing a 310,016-token pool, with 988,977,664 bytes of BF16 drafter weights and 23,740,413,488 bytes tracked at startup. The launcher supplied that cap and the same BF16 drafter path to the serve command. This fixture checked the planner and launch arguments on the desktop without loading weights on an RTX 4090. The receipt is `paged-build/fix2/launcher-4090-final/` in the run folder.
+
+The ThinkStation RTX 3070 Ti ran the no-model paged attention contract on sm_86. Eight paged attention contracts and two FP8 preparation checks passed with the same kernel images as the final x86_64 archive. The receipt is `paged-build/fix2/thinkstation/contract.log` in the run folder.
 
 ### Prefix reuse with reclaimable state
 
@@ -14,10 +20,12 @@ The RTX PRO 4500 served 3.3 bpw with FP8 KV and DFlash2 at `--parallel 4 --conte
 
 | Prompt | Reused tokens | Additional pool pages held | Cold TTFT | Hit TTFT | Greedy agreement |
 |---|---:|---:|---:|---:|---:|
-| Same 8k text | 7,936/8,192 | 62 | 3.176 s | 0.157 s | 400/400 |
-| Same PNG and text | 768/1,013 | 29 | 0.640 s | 0.136 s | 400/400 |
+| Same 8k text | 7,936/8,192 | 62 | 3.322 s | 0.162 s | 400/400 |
+| Same PNG and text | 768/1,013 | 29 | 0.685 s | 0.134 s | 400/400 |
 
 The text mark held 31 global KV pages and 31 state pages. The image mark held three global KV pages and 26 state pages. A pool page can hold 256 global KV rows. Four simultaneous requests each resumed the same 2,560-token system prefix. Live leases occupied 4,608 token rows at peak during their common decode interval, compared with 12,288 rows if each request held its own pages.
+
+Round two also exercised DSpark with the same prompts. DSpark resumed 7,936 text tokens and 768 image-prompt tokens, and both continuations agreed over all 400 tokens. TTFT went from 3.283 to 0.158 s for text and 0.726 to 0.139 s for the image. The image mark used 22 pages with DSpark’s compact committed state. [Planner receipts](planner/).
 
 On a 39,680-token pool, a 23,808-token live reservation evicted the older of two retained 8k prefixes. Eviction released 62 pages, split evenly between global KV and restart state. The recently used prefix still resumed at 7,936 tokens. The evicted prompt then prefilled from token zero, matched 400/400 greedy tokens, and resumed at 7,936 tokens on its next request.
 
