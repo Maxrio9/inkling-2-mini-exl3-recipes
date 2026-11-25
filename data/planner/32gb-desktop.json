@@ -6,8 +6,8 @@
   "drafts": true,
   "drafter": "DFlash2",
   "model_cap": 1048576,
-  "maximum": 188032,
-  "rounded_down": 187392,
+  "maximum": 704496,
+  "rounded_down": 703488,
   "model_cap_binds": false,
   "memory": {
     "total": {
@@ -33,7 +33,10 @@
     "limit": null
   },
   "result": {
-    "context": 188032,
+    "context": 704496,
+    "pool_tokens": 705280,
+    "fixed_bytes_per_stream": 331131144,
+    "snapshot_slots": 0,
     "admitted": true,
     "refused_at": null,
     "message": null,
@@ -58,8 +61,8 @@
         "gib": 0.006592512130737305
       },
       "model_working": {
-        "bytes": 2349661036,
-        "gib": 2.1882923655211926
+        "bytes": 3141991660,
+        "gib": 2.926207762211561
       },
       "backend_shared": {
         "bytes": 6406480,
@@ -78,8 +81,12 @@
         "gib": 0.00049591064453125
       },
       "target_global_kv": {
-        "bytes": 3176988672,
-        "gib": 2.95880126953125
+        "bytes": 11916410880,
+        "gib": 11.0980224609375
+      },
+      "target_page_table": {
+        "bytes": 11008,
+        "gib": 1.0251998901367188e-05
       },
       "target_local_kv": {
         "bytes": 259522560,
@@ -120,24 +127,28 @@
         "gib": 13.712010383605957
       },
       "first_stream_state": {
-        "bytes": 5919202500,
-        "gib": 5.512686911970377
+        "bytes": 3534555460,
+        "gib": 3.291811291128397
       },
       "model": {
-        "bytes": 21164634780,
-        "gib": 19.7111021541059
+        "bytes": 18779987740,
+        "gib": 17.49022653326392
       },
       "per_stream": {
-        "bytes": 3508108808,
-        "gib": 3.2671809270977974
+        "bytes": 331131144,
+        "gib": 0.30838990956544876
       },
       "extra_streams": {
-        "bytes": 10524326424,
-        "gib": 9.801542781293392
+        "bytes": 993393432,
+        "gib": 0.9251697286963463
+      },
+      "snapshot_bytes": {
+        "bytes": 0,
+        "gib": 0
       },
       "ready": {
-        "bytes": 31688961204,
-        "gib": 29.512644935399294
+        "bytes": 31689792052,
+        "gib": 29.513418722897768
       }
     },
     "rooms": {
@@ -150,32 +161,24 @@
         "gib": 15.317209757864475
       },
       "after_model": {
-        "bytes": 10527526244,
-        "gib": 9.804522845894098
-      },
-      "after_staging": {
-        "bytes": 10527526244,
-        "gib": 9.804522845894098
+        "bytes": 12912173284,
+        "gib": 12.025398466736078
       },
       "extra_streams": {
-        "bytes": 10527526244,
-        "gib": 9.804522845894098
+        "bytes": 12912173284,
+        "gib": 12.025398466736078
       },
       "after_streams": {
-        "bytes": 3199820,
-        "gib": 0.0029800646007061005
-      },
-      "prompt_cache_budget": {
-        "bytes": 3199820,
-        "gib": 0.0029800646007061005
+        "bytes": 2368972,
+        "gib": 0.0022062771022319794
       }
     }
   },
   "next_context": {
-    "context": 188033,
+    "context": 704497,
     "admitted": false,
     "refused_at": "streams",
-    "message": "--parallel 4 needs 9.80 GiB for its streams at a 188033-token window, and the CUDA memory budget leaves 9.80 GiB: serve --parallel 3, or lower --context",
+    "message": "--parallel 4 exceeds the room for Mini CUDA lanes beside one request at --context 704497",
     "components": {
       "target_weights": {
         "bytes": 14723159040,
@@ -197,8 +200,8 @@
         "gib": 0.006592512130737305
       },
       "model_working": {
-        "bytes": 2349661036,
-        "gib": 2.1882923655211926
+        "bytes": 3141991660,
+        "gib": 2.926207762211561
       },
       "backend_shared": {
         "bytes": 6406480,
@@ -217,8 +220,12 @@
         "gib": 0.00049591064453125
       },
       "target_global_kv": {
-        "bytes": 3178070016,
-        "gib": 2.959808349609375
+        "bytes": 0,
+        "gib": 0
+      },
+      "target_page_table": {
+        "bytes": 11012,
+        "gib": 1.025572419166565e-05
       },
       "target_local_kv": {
         "bytes": 259522560,
@@ -253,32 +260,6 @@
         "gib": 1.5735626220703125e-05
       }
     },
-    "tracked": {
-      "weights_check": {
-        "bytes": 14723159040,
-        "gib": 13.712010383605957
-      },
-      "first_stream_state": {
-        "bytes": 5920283844,
-        "gib": 5.513693992048502
-      },
-      "model": {
-        "bytes": 21165716124,
-        "gib": 19.712109234184027
-      },
-      "per_stream": {
-        "bytes": 3509190152,
-        "gib": 3.2681880071759224
-      },
-      "extra_streams": {
-        "bytes": 10527570456,
-        "gib": 9.804564021527767
-      },
-      "ready": {
-        "bytes": 31693286580,
-        "gib": 29.516673255711794
-      }
-    },
     "rooms": {
       "weights": {
         "bytes": 31692161024,
@@ -289,27 +270,24 @@
         "gib": 15.317209757864475
       },
       "after_model": {
-        "bytes": 10526444900,
-        "gib": 9.803515765815973
-      },
-      "after_staging": {
-        "bytes": 10526444900,
-        "gib": 9.803515765815973
+        "bytes": 12912173280,
+        "gib": 12.025398463010788
       },
       "extra_streams": {
-        "bytes": 10526444900,
-        "gib": 9.803515765815973
+        "bytes": 12912173280,
+        "gib": 12.025398463010788
       },
-      "after_streams": null,
-      "prompt_cache_budget": null
+      "after_streams": null
     }
   },
   "recipe": {
-    "context": 156672,
-    "prompt_cache_gib": 2,
+    "context": 703488,
     "vision": false,
     "result": {
-      "context": 156672,
+      "context": 703488,
+      "pool_tokens": 705280,
+      "fixed_bytes_per_stream": 331131132,
+      "snapshot_slots": 0,
       "admitted": true,
       "refused_at": null,
       "message": null,
@@ -334,8 +312,8 @@
           "gib": 0.006592512130737305
         },
         "model_working": {
-          "bytes": 2298542956,
-          "gib": 2.1406849436461926
+          "bytes": 3141991660,
+          "gib": 2.926207762211561
         },
         "backend_shared": {
           "bytes": 6406480,
@@ -354,8 +332,12 @@
           "gib": 0.00049591064453125
         },
         "target_global_kv": {
-          "bytes": 2647130112,
-          "gib": 2.46533203125
+          "bytes": 11916410880,
+          "gib": 11.0980224609375
+        },
+        "target_page_table": {
+          "bytes": 10996,
+          "gib": 1.0240823030471802e-05
         },
         "target_local_kv": {
           "bytes": 259522560,
@@ -396,24 +378,28 @@
           "gib": 13.712010383605957
         },
         "first_stream_state": {
-          "bytes": 5338225860,
-          "gib": 4.971610251814127
+          "bytes": 3534555448,
+          "gib": 3.291811279952526
         },
         "model": {
-          "bytes": 20583658140,
-          "gib": 19.17002549394965
+          "bytes": 18779987728,
+          "gib": 17.49022652208805
         },
         "per_stream": {
-          "bytes": 2978250248,
-          "gib": 2.7737116888165474
+          "bytes": 331131132,
+          "gib": 0.30838989838957787
         },
         "extra_streams": {
-          "bytes": 8934750744,
-          "gib": 8.321135066449642
+          "bytes": 993393396,
+          "gib": 0.9251696951687336
+        },
+        "snapshot_bytes": {
+          "bytes": 0,
+          "gib": 0
         },
         "ready": {
-          "bytes": 29518408884,
-          "gib": 27.491160560399294
+          "bytes": 31689792004,
+          "gib": 29.513418678194284
         }
       },
       "rooms": {
@@ -426,24 +412,16 @@
           "gib": 15.317209757864475
         },
         "after_model": {
-          "bytes": 11108502884,
-          "gib": 10.345599506050348
-        },
-        "after_staging": {
-          "bytes": 11108502884,
-          "gib": 10.345599506050348
+          "bytes": 12912173296,
+          "gib": 12.02539847791195
         },
         "extra_streams": {
-          "bytes": 11108502884,
-          "gib": 10.345599506050348
+          "bytes": 12912173296,
+          "gib": 12.02539847791195
         },
         "after_streams": {
-          "bytes": 2173752140,
-          "gib": 2.024464439600706
-        },
-        "prompt_cache_budget": {
-          "bytes": 2173752140,
-          "gib": 2.024464439600706
+          "bytes": 2369020,
+          "gib": 0.002206321805715561
         }
       }
     }

@@ -4,33 +4,35 @@ These TensorFold rc1 recipes run Inkling 2 Mini locally on NVIDIA GPUs through a
 
 ## Pick your card
 
-Use the desktop row if this GPU also drives your display. The KV pool is the total number of tokens the card holds in its KV cache across all parallel requests, prompt and reply included. Each request gets an equal slot of the pool: divide by the number of parallel requests for the longest single conversation. All rows use FP8 KV. The vision column is the pool when image input is enabled with `--vision`. Each row comes from TensorFold's planner using the target and the packed DFlash2 checkpoint. [Planner receipts](data/planner)
+Use the desktop row if this GPU also drives your display. The shared KV pool holds prompt and reply tokens for all active requests. One request can use most of the pool while other requests stay short. A request waits when its reservation exceeds the space available. The per-request cap bounds prompt plus reply length. All rows use FP8 KV. Each row comes from TensorFold's planner using the target weights and, where enabled, the packed DFlash2 checkpoint. [Planner receipts](data/planner)
 
-| GPU memory | Model branch | Parallel requests | KV pool, text | KV pool, with vision | DFlash2 | Prompt cache | Configs |
-|---|---|---:|---:|---:|---|---:|---|
+<!-- planner-table:start -->
+| GPU memory | Model branch | Parallel requests | KV pool, text | KV pool, with vision | Per-request cap (text / vision) | DFlash2 | Configs |
+|---|---|---:|---:|---:|---:|---|---|
 | 12 GB | No fit | — | — | — | — | — | — |
-| 16 GB | `3.3bpw` | 1 | 39,936 | — | On | 0 GiB | [Text](configs/16gb.toml) |
-| 16 GB, desktop | `3.3bpw` | 1 | 40,960 | — | Off | 0 GiB | [Text](configs/16gb-desktop.toml) |
-| 16 GB, long context | `3.3bpw` | 1 | 76,800 | — | Off | 0 GiB | [Text](configs/16gb-long.toml) |
-| 24 GB | `4.0bpw` | 2 | 233,472 | 153,600 | On | 2 GiB | [Text](configs/24gb.toml) · [Vision](configs/24gb-vision.toml) |
-| 24 GB, desktop | `4.0bpw` | 1 | 184,320 | 108,544 | On | 2 GiB | [Text](configs/24gb-desktop.toml) · [Vision](configs/24gb-desktop-vision.toml) |
-| 32 GB | `4.0bpw` | 4 | 688,128 | 602,112 | On | 2 GiB | [Text](configs/32gb.toml) · [Vision](configs/32gb-vision.toml) |
-| 32 GB, desktop | `4.0bpw` | 4 | 626,688 | 540,672 | On | 2 GiB | [Text](configs/32gb-desktop.toml) · [Vision](configs/32gb-desktop-vision.toml) |
-| DGX Spark | `4.0bpw` | 8 | 4,874,240 | 4,784,128 | On | 8 GiB | [Text](configs/dgx-spark.toml) · [Vision](configs/dgx-spark-vision.toml) |
-| DGX Spark, desktop | `4.0bpw` | 8 | 4,816,896 | 4,718,592 | On | 8 GiB | [Text](configs/dgx-spark-desktop.toml) · [Vision](configs/dgx-spark-desktop-vision.toml) |
+| 16 GB | `3.3bpw` | 1 | 40,192 | — | 39,936 | On | [Text](configs/16gb.toml) |
+| 16 GB, desktop | `3.3bpw` | 1 | 40,192 | — | 39,936 | Off | [Text](configs/16gb-desktop.toml) |
+| 16 GB, long context | `3.3bpw` | 1 | 77,056 | — | 76,800 | Off | [Text](configs/16gb-long.toml) |
+| 24 GB | `4.0bpw` | 2 | 342,272 | 263,936 | 340,992 / 263,168 | On | [Text](configs/24gb.toml) · [Vision](configs/24gb-vision.toml) |
+| 24 GB, desktop | `4.0bpw` | 2 | 283,136 | 206,592 | 282,624 / 205,824 | On | [Text](configs/24gb-desktop.toml) · [Vision](configs/24gb-desktop-vision.toml) |
+| 32 GB | `4.0bpw` | 4 | 762,880 | 683,776 | 761,856 / 681,984 | On | [Text](configs/32gb.toml) · [Vision](configs/32gb-vision.toml) |
+| 32 GB, desktop | `4.0bpw` | 4 | 705,280 | 624,896 | 703,488 / 623,616 | On | [Text](configs/32gb-desktop.toml) · [Vision](configs/32gb-desktop-vision.toml) |
+| DGX Spark | `4.0bpw` | 8 | 5,348,608 | 5,257,728 | 1,048,576 / 1,048,576 | On | [Text](configs/dgx-spark.toml) · [Vision](configs/dgx-spark-vision.toml) |
+| DGX Spark, desktop | `4.0bpw` | 8 | 5,285,120 | 5,194,240 | 1,048,576 / 1,048,576 | On | [Text](configs/dgx-spark-desktop.toml) · [Vision](configs/dgx-spark-desktop-vision.toml) |
+<!-- planner-table:end -->
 
-The desktop rows leave 1 GiB for the display session. All 16 GB rows use a 0.5 GiB engine reserve. The headless 16 GB default uses DFlash2. The 16 GB desktop recipe uses plain decode and disables the lazy-head proxy to fit its 40,960-token window. Use the 16 GB long-context row for longer documents.
+The desktop rows leave 1 GiB for the display session. All 16 GB rows use a 0.5 GiB engine reserve. The headless 16 GB default uses DFlash2. The 16 GB desktop recipe uses plain decode and disables the lazy-head proxy. The 16 GB long-context recipe uses plain decode to leave more room for KV.
 
-Each text and vision pair uses the same stream count. The 24 GB desktop pair uses one stream because two streams with vision leave only 1.38 GiB for prompt caching at 65,536 tokens per request. The text-only 24 GB desktop plan can serve two streams at 87,040 tokens with a 2 GiB cache when selected with the calculator.
+Prompt caching is on by default. Repeated text and image prefixes can reuse the same global KV pages. When the engine retains a prefix, it takes additional pages from the same pool to save the convolution, sliding attention and drafter state needed to resume. The full pool is available to live requests, which can reclaim retained prefixes and their state in least-recently-used order. Use `--prompt-cache-gib N` to cap retention or set `--prompt-cache-gib 0` or `TF_KV_SHARE=0` to disable it.
 
-The planner keeps at least 65,536 tokens per request in every cached preset. It reserves 2 GiB on 24 GB and 32 GB cards and 8 GiB on Spark, then takes the largest context rounded down to 1,024 tokens. The launcher checks current free memory and adjusts context and cache before starting.
+The listed caps round the planner's maximum down to a multiple of 1,024 tokens. Each text and vision pair uses the same stream count. The launcher checks available memory before serving and lowers the selected cap if needed.
 
 ## Start
 
-1. From the rc1 recipes checkout, run `./start.sh --engine-archive /path/to/rc1-archive.tar.gz`.
+1. From the rc1 recipes checkout, run `./start.sh --engine-archive /path/to/paged-archive.tar.gz`.
 2. Once the server is ready, open [the model endpoint](http://127.0.0.1:8080/v1/models).
 
-The launcher uses Linux, Python 3.11 or newer, and the NVIDIA driver. Use the prepared local archive for rc1. `./start.sh --dry-run` shows the selected recipe. Add `--vision` before `--` to select the matching vision preset on a 24 GB or larger card. To start offline, supply `--engine-archive FILE` and `--model-dir DIR`. Drafted recipes also need a verified `dflash2/` bundle in that model directory or `-- --drafter DIR`. Run `./start.sh --help` for card, display, and model overrides. Pass TensorFold flags after `--`, as in `./start.sh -- --port 8081`.
+The launcher uses Linux, Python 3.11 or newer, and the NVIDIA driver. Use the prepared local paged archive. `./start.sh --dry-run` shows the selected recipe. Add `--vision` before `--` to select the matching vision preset on a 24 GB or larger card. To start offline, supply `--engine-archive FILE` and `--model-dir DIR`. Drafted recipes also need a verified `dflash2/` bundle in that model directory or `-- --drafter DIR`. Run `./start.sh --help` for card, display, and model overrides. Pass TensorFold flags after `--`, as in `./start.sh -- --port 8081`.
 
 On Blackwell, the launcher checks the 8-bit drafter repository [Maxrio/Inkling-2-Mini-DFlash2-FP8](https://huggingface.co/Maxrio/Inkling-2-Mini-DFlash2-FP8) and verifies `SHA256SUMS` before installing the bundle. If the package is absent, it downloads Inco AI's pinned BF16 checkpoint and checks each file against a pinned SHA-256 digest. Older GPUs use that BF16 checkpoint directly. The launcher exposes the verified bundle under the model's `dflash2/` path and uses it for both planning and serving.
 
@@ -40,7 +42,7 @@ The vision presets need the CUDA 13 cuBLAS runtime so TensorFold can find `libcu
 
 You need Linux with glibc 2.28 or newer, an NVIDIA driver that supports your GPU and CUDA 13, and the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli).
 
-1. **Verify and extract the prepared rc1 archive.** Use Linux x86_64 for RTX 30 (sm_86), RTX 40 (sm_89), RTX 50 and RTX PRO Blackwell (sm_120). Use Linux aarch64 for DGX Spark (GB10, sm_121). Check the archive against its accompanying SHA-256 digest.
+1. **Verify and extract the prepared paged archive.** Use Linux x86_64 for RTX 30 (sm_86), RTX 40 (sm_89), RTX 50 and RTX PRO Blackwell (sm_120). Use Linux aarch64 for DGX Spark (GB10, sm_121). Check the archive against its accompanying SHA-256 digest.
 
    From the directory where you extracted the archive, enter its folder.
 
@@ -48,7 +50,7 @@ You need Linux with glibc 2.28 or newer, an NVIDIA driver that supports your GPU
    cd tensorfold-1.3.4-linux-x86_64
    ```
 
-   On DGX Spark, use the folder ending in `linux-aarch64`.
+   On DGX Spark, use the folder ending in `linux-aarch64`. The shared-pool presets apply to sm_120 and sm_121. The x86_64 archive also includes the legacy CUDA path for sm_86 and sm_89. On those GPUs, set a context you have checked for the chosen stream count with `./start.sh -- --context N` or supply your own config.
 
 2. **Download the model branch for your GPU.** This command uses the 24 GB example. Use the launcher to install the matching drafter, or place a verified DFlash2 bundle in `inkling-mini/dflash2`.
 
@@ -69,7 +71,7 @@ The OpenAI-compatible API is at `http://127.0.0.1:8080/v1`. Open `http://127.0.0
 
 ### Build from source
 
-Install Zig 0.17.0 and a CUDA toolkit with `nvcc` that supports your GPU. From the prepared TensorFold rc1 source checkout, set `-Dgpu` to the architecture in step 1.
+Install Zig 0.17.0 and a CUDA toolkit with `nvcc` that supports your GPU. From the prepared TensorFold paged source checkout, set `-Dgpu` to the architecture in step 1.
 
 ```sh
 zig build -Dgpu=sm_120 -Dnvcc="$(command -v nvcc)"
@@ -77,7 +79,9 @@ zig build -Dgpu=sm_120 -Dnvcc="$(command -v nvcc)"
 
 Use `zig-out/native/bin/tensorfold-native` in step 3. The TensorFold checkout's `RUNBOOK.md` describes how to build the grammar library alongside the native binary.
 
-## Speed you can expect
+## RC1 speed measurements
+
+The final paged build passed the 3% desktop throughput gate for single-request code, single-request prose, and four mixed requests. [Paged build results](data/MEASUREMENTS.md)
 
 On RTX PRO 4500, the rc1 head-precision bracket served the 3.3bpw target with FP8 KV and FP8 DFlash2 layers. Each phase used three greedy repeats, 8,192 input tokens, 400 output tokens and disabled prompt caching.
 
@@ -160,11 +164,11 @@ These contributors supplied upstream work used in the port.
 |---|---|
 | `--config FILE` | Reads a TOML config. Command-line values override the file. |
 | `--context N` | Sets the prompt-plus-output limit for each request. |
-| `--parallel N` | Reserves memory for N simultaneous requests. The model supports up to 16. |
+| `--parallel N` | Sets the concurrency limit. The model supports up to 16 requests sharing the pool. |
 | `--kv-cache fp8\|bf16` | Sets the target KV cache format. BF16 uses more memory. |
 | `--no-drafts` | Runs plain decoding. Remove `no-drafts = true` from the file to enable drafts. |
 | `--drafter DIR` | Chooses a drafter directory. The launcher normally passes the installed `dflash2/` bundle. |
-| `--prompt-cache-gib N` | Sets the memory cap for retained prompt state. The planner uses the free memory after loading all request slots. |
+| `--prompt-cache-gib N` | Optionally caps the pool pages held for prefixes and their restart state. Zero disables prefix caching. |
 | `--vision` | Enables image input and reserves memory for the vision encoder and prompt rows. |
 | `--host HOST`, `--port PORT` | Set the listen address and port. |
 | `--name NAME` | Sets the model ID clients use. |
@@ -173,7 +177,7 @@ The rc1 CUDA backend supports automatic, required and named tool calls and schem
 
 ### Make your own config
 
-The calculator asks TensorFold's planner (`tensorfold-native plan`) and prints TOML. The planner reads the downloaded model branch and needs no GPU. It needs an engine build that includes the planner.
+The calculator asks TensorFold's planner (`tensorfold-native plan`) and prints TOML. The planner reads the downloaded model branch and needs no GPU. Use the paged Mini build of the planner.
 
 ```sh
 python3 tools/recipes.py --card 24 --model ./inkling-mini --drafter ./inkling-mini/dflash2 > recipe.toml
@@ -189,7 +193,8 @@ python3 tools/recipes.py --card 24 --model ./inkling-mini --drafter ./inkling-mi
 | `--draft-min-context N` | Plans plain decode if drafting fits fewer than N tokens per request. |
 | `--plain-head` | Budgets the output head without the lazy-head proxy, as in the 16 GB desktop recipe. |
 | `--vision`, `--no-vision` | Includes or excludes vision memory. Vision is off by default and available from 24 GB up. |
-| `--prompt-cache`, `--no-prompt-cache` | Budgets 2 GiB on 24 GB and 32 GB cards and up to 8 GiB on Spark while keeping at least 65,536 tokens per request. |
+| `--prompt-cache`, `--no-prompt-cache` | Uses the engine's default shared prefix cache or disables it. |
+| `--prompt-cache-gib N` | Caps the pool pages held for prefixes and their restart state. Zero disables caching. |
 | `--kv fp8\|bf16` | Chooses the target KV format. BF16 uses more memory. |
 | `--reserve-gib R` | Sets the engine reserve, as `TENSORFOLD_MEMORY_RESERVE_GIB` would. |
 | `--binary PATH`, `--json` | Picks the engine binary; prints the planner's full report with bytes per component. |

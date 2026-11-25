@@ -1,6 +1,5 @@
 # Model branch: 4.0bpw. Pass its downloaded directory to serve.
 # Context per request includes input and output; sized by tensorfold-native plan.
-context = 172032
+context = 761856
 parallel = 4
 kv-cache = "fp8"
-prompt-cache-gib = 2

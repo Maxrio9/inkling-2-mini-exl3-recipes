@@ -3,8 +3,7 @@
 # Start with TF_INKLING2_LAZY_HEAD=0 set.
 # Leaves 1 GiB for the desktop session on this GPU.
 # Context per request includes input and output; sized by tensorfold-native plan.
-context = 40960
+context = 39936
 parallel = 1
 kv-cache = "fp8"
-prompt-cache-gib = 0
 no-drafts = true

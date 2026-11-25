@@ -78,7 +78,9 @@ if ! [[ $driver_info =~ $cuda_version ]] || ((BASH_REMATCH[2] < 13)); then
     die "NVIDIA driver $driver must support CUDA 13 or later"
 fi
 export CUDA_VISIBLE_DEVICES=$uuid
+paged=true
 if ((${capability/./} < 120)); then
+    paged=false
     export TF_INKLING2_DRAFT_FP8_LAYERS=0 TF_INKLING2_DRAFT_FP8_HEAD=0 TF_INKLING2_LAZY_HEAD=0
 fi
 
@@ -164,7 +166,7 @@ for key, default in (
     ("context", 0), ("parallel", 1), ("kv-cache", "fp8"), ("no-drafts", False),
     ("host", "127.0.0.1"), ("port", 8080), ("name", "inkling-2-mini"), ("drafter", ""),
     ("vision", False), ("vision-max-images", 4), ("vision-image-tokens", 4096),
-    ("vision-image-share", "request"), ("prompt-cache-gib", 0),
+    ("vision-image-share", "request"), ("prompt-cache-gib", ""),
 ):
     value = config.get(key, default)
     print(str(value).lower() if isinstance(value, bool) else value)
@@ -176,6 +178,9 @@ PY
 mapfile -t settings <<< "$settings"
 context=${overrides[--context]:-${settings[0]}}
 [[ $context =~ ^(0|[1-9][0-9]*)$ ]] || die 'Context must be a nonnegative integer'
+if ! $paged && { [[ $context == 0 ]] || [[ ! ${overrides[--context]:-} && $config == "$repo/configs/$recipe.toml" ]]; }; then
+    die "Shared-pool presets require sm_120 or later. For legacy CUDA, pass -- --context N or a config with an explicit context."
+fi
 parallel=${overrides[--parallel]:-${settings[1]}}
 kv=${overrides[--kv-cache]:-${settings[2]}}
 host=${overrides[--host]:-${settings[4]}}
@@ -218,9 +223,18 @@ if $dry; then
     if [[ $model_dir ]]; then printf 'Would use local model %s.\n' "$model_dir"
     else printf 'Would refresh %s (%s) with hf and verify SHA256SUMS.\n' "$model_repo" "$branch"
     fi
-    printf 'Would plan %s streams at context %s with %s KV, then serve %s at http://%s:%s/v1/models.\n' \
-        "$parallel" "$context" "$kv" "$name" "$url_host" "$port"
-    printf 'Vision: %s. Prompt cache cap: %s GiB.\n' "$vision" "$prompt_cache"
+    if $paged; then
+        printf 'Would plan %s streams at context %s with %s KV, then serve %s at http://%s:%s/v1/models.\n' \
+            "$parallel" "$context" "$kv" "$name" "$url_host" "$port"
+    else
+        printf 'Would serve %s legacy CUDA streams at context %s with %s KV at http://%s:%s/v1/models.\n' \
+            "$parallel" "$context" "$kv" "$url_host" "$port"
+    fi
+    if [[ $prompt_cache ]]; then
+        printf 'Vision: %s. Prompt cache cap: %s GiB.\n' "$vision" "$prompt_cache"
+    else
+        printf 'Vision: %s. Prompt cache uses the engine default.\n' "$vision"
+    fi
     if $no_drafts; then printf 'Speculative decoding would be disabled.\n'
     elif [[ $drafter ]]; then printf 'Would use drafter %s.\n' "$drafter"
     elif [[ $model_dir ]]; then printf 'Would use a verified DFlash2 bundle at %s/dflash2.\n' "$model_dir"
@@ -448,47 +462,47 @@ if ! $no_drafts && [[ ! $drafter ]]; then
     fi
 fi
 
-plan=("$binary" plan "$model_dir" --device-mib "$total" --parallel "$parallel" --kv-cache "$kv" --json)
-if $unified; then
-    free=$(awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo)
-    plan+=(--unified)
-else
-    free=$(nvidia-smi -i "$uuid" --query-gpu=memory.free --format=csv,noheader,nounits)
-    [[ $free =~ ^[0-9]+$ ]] || die 'Could not refresh free GPU memory'
-    # nvidia-smi runs before the engine opens its CUDA context.
-    free=$((free > 335 ? free - 335 : 0))
-fi
-if ((free > total)); then free=$total; fi
-plan+=(--free-mib "$free")
-if [[ ${TENSORFOLD_MEMORY_RESERVE_GIB:-} ]]; then plan+=(--reserve-gib "$TENSORFOLD_MEMORY_RESERVE_GIB"); fi
-if [[ ${TENSORFOLD_CUDA_MEMORY_LIMIT_GB:-} ]]; then plan+=(--limit-gib "$TENSORFOLD_CUDA_MEMORY_LIMIT_GB"); fi
+model_flags=()
 if $no_drafts; then
-    plan+=(--no-drafts)
-    serve_flags+=(--no-drafts)
+    model_flags+=(--no-drafts)
 elif [[ $drafter ]]; then
-    plan+=(--drafter "$drafter")
-    serve_flags+=(--drafter "$drafter")
+    model_flags+=(--drafter "$drafter")
 fi
 if [[ $vision == true ]]; then
-    vision_flags=(--vision --vision-max-images "$max_images" --vision-image-tokens "$image_tokens" --vision-image-share "$image_share")
-    plan+=("${vision_flags[@]}")
-    serve_flags+=("${vision_flags[@]}")
+    model_flags+=(--vision --vision-max-images "$max_images" --vision-image-tokens "$image_tokens" --vision-image-share "$image_share")
 fi
-selection=$(python3 "$repo/tools/recipes.py" --startup "$context" "$prompt_cache" "${plan[@]}") ||
-    die 'Could not determine a usable context'
-read -r verdict cache_verdict <<< "$selection"
-if [[ $context != 0 && $verdict != "$context" ]]; then
-    printf 'Reducing context from %s to %s tokens to fit current free memory.\n' "$context" "$verdict"
-elif [[ $context == 0 ]]; then
-    printf 'Planner admitted %s tokens per request.\n' "$verdict"
-fi
+if [[ $prompt_cache ]]; then model_flags+=(--prompt-cache-gib "$prompt_cache"); fi
 
-if [[ $cache_verdict != "$prompt_cache" ]]; then
-    printf 'Planner set the prompt cache cap to %s GiB to fit current memory.\n' "$cache_verdict"
+serve_flags+=("${model_flags[@]}")
+
+verdict=$context
+if $paged; then
+    plan=("$binary" plan "$model_dir" --device-mib "$total" --parallel "$parallel" --kv-cache "$kv" --json)
+    if $unified; then
+        free=$(awk '/^MemAvailable:/ {print int($2/1024)}' /proc/meminfo)
+        plan+=(--unified)
+    else
+        free=$(nvidia-smi -i "$uuid" --query-gpu=memory.free --format=csv,noheader,nounits)
+        [[ $free =~ ^[0-9]+$ ]] || die 'Could not refresh free GPU memory'
+        # nvidia-smi runs before the engine opens its CUDA context.
+        free=$((free > 335 ? free - 335 : 0))
+    fi
+    if ((free > total)); then free=$total; fi
+    plan+=(--free-mib "$free")
+    if [[ ${TENSORFOLD_MEMORY_RESERVE_GIB:-} ]]; then plan+=(--reserve-gib "$TENSORFOLD_MEMORY_RESERVE_GIB"); fi
+    if [[ ${TENSORFOLD_CUDA_MEMORY_LIMIT_GB:-} ]]; then plan+=(--limit-gib "$TENSORFOLD_CUDA_MEMORY_LIMIT_GB"); fi
+    plan+=("${model_flags[@]}")
+    selection=$(python3 "$repo/tools/recipes.py" --startup "$context" "${plan[@]}") ||
+        die 'Could not determine a usable context'
+    read -r verdict pool_tokens <<< "$selection"
+    if [[ $context != 0 && $verdict != "$context" ]]; then
+        printf 'Reducing context from %s to %s tokens to fit current free memory.\n' "$context" "$verdict"
+    fi
+    printf 'Planner admitted a %s-token KV pool with %s tokens per request.\n' "$pool_tokens" "$verdict"
 fi
 printf 'Model: %s\nOpen http://%s:%s/v1/models\n' "$name" "$url_host" "$port"
 rm -rf -- "$stage"
 trap - EXIT
 exec 9>&-
 exec "$binary" serve "$model_dir" --no-update-check --config "$config" --context "$verdict" --parallel "$parallel" \
-    --kv-cache "$kv" --prompt-cache-gib "$cache_verdict" --host "$host" --port "$port" --name "$name" "${serve_flags[@]}"
+    --kv-cache "$kv" --host "$host" --port "$port" --name "$name" "${serve_flags[@]}"

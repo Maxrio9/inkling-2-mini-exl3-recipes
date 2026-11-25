@@ -1,9 +1,13 @@
+import contextlib
+import io
 import json
+import tomllib
 import unittest
+from subprocess import CompletedProcess
 from pathlib import Path
 from unittest.mock import patch
 
-from recipes import CARDS, GIB, cache_bytes, choose_cache, paired_streams, planner_args, toml
+from recipes import CARDS, planner_args, run_planner, startup, toml
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,8 +18,8 @@ SHIPPED = {
     '16gb-desktop': ('16', True, False, False, 1),
     '24gb': ('24', False, True, False, 2),
     '24gb-vision': ('24', False, True, True, 2),
-    '24gb-desktop': ('24', True, True, False, 1),
-    '24gb-desktop-vision': ('24', True, True, True, 1),
+    '24gb-desktop': ('24', True, True, False, 2),
+    '24gb-desktop-vision': ('24', True, True, True, 2),
     '32gb': ('32', False, True, False, 4),
     '32gb-vision': ('32', False, True, True, 4),
     '32gb-desktop': ('32', True, True, False, 4),
@@ -42,7 +46,9 @@ class RecipeTest(unittest.TestCase):
             self.assertEqual(r['recipe']['vision'], vision, name)
             self.assertEqual(r['kv_cache'], c['kv'], name)
             expected = toml(r, card, desktop, c['reserve_gib'], c['branch'], c['kv'])
-            self.assertEqual((ROOT / 'configs' / f'{name}.toml').read_text(), expected, name)
+            config = (ROOT / 'configs' / f'{name}.toml').read_text()
+            self.assertEqual(config, expected, name)
+            self.assertNotIn('prompt-cache-gib', tomllib.loads(config), name)
 
     def test_recorded_reports_sit_on_the_admission_boundary(self):
         for name in SHIPPED:
@@ -59,7 +65,13 @@ class RecipeTest(unittest.TestCase):
             self.assertTrue(chosen['result']['admitted'], name)
             self.assertEqual(chosen['context'], chosen['result']['context'], name)
             self.assertLessEqual(chosen['context'], r['rounded_down'], name)
-            self.assertLessEqual(chosen['prompt_cache_gib'] * GIB, cache_bytes(chosen['result']), name)
+            result = chosen['result']
+            pool = result['pool_tokens']
+            self.assertGreaterEqual(pool, chosen['context'] + 16, name)
+            self.assertEqual(pool % 256, 0, name)
+            self.assertEqual(result['fixed_bytes_per_stream'], result['tracked']['per_stream']['bytes'], name)
+            self.assertEqual(result['components']['target_global_kv']['bytes'],
+                             pool * result['components']['global_kv_per_token']['bytes'], name)
 
     def test_planner_arguments(self):
         self.assertEqual(planner_args('16', True, 1, False, 'fp8', 0.5),
@@ -72,53 +84,59 @@ class RecipeTest(unittest.TestCase):
                          ['--device-mib', '24564', '--parallel', '2', '--kv-cache', 'fp8',
                           '--drafter', './draft', '--vision'])
 
-    def test_prompt_cache_preserves_largest_context_with_two_gib(self):
-        def result(context):
-            budget = max(0, (80 * 1024 - context) * GIB // (4 * 1024))
-            return {'context': context, 'rooms': {'prompt_cache_budget': {'bytes': budget}}}
+    def test_optional_prompt_cap_in_plan_and_toml(self):
+        args = planner_args('32', False, 4, True, 'fp8', None, prompt_cache_gib=0)
+        self.assertEqual(args[-2:], ['--prompt-cache-gib', '0'])
+        report = {'rounded_down': 32768, 'parallel': 4, 'drafts': True,
+                  'recipe': {'context': 32768, 'prompt_cache_gib': 1.5}}
+        self.assertEqual(tomllib.loads(toml(report, '32', False, None, '4.0bpw', 'fp8'))['prompt-cache-gib'], 1.5)
 
-        with patch('recipes.run_planner', side_effect=lambda _, context: {'result': result(context)}):
-            context, gib, selected = choose_cache([], 80 * 1024, 2, result(80 * 1024))
-        self.assertEqual((context, gib), (72 * 1024, 2))
-        self.assertEqual(selected, result(context))
+    def test_planner_requires_shared_pool_state_for_admitted_results(self):
+        for pool, slots, snapshot_bytes in [(True, 0, 0), (True, 2, 1024), (True, 0, 1024), (False, 0, 0)]:
+            with self.subTest(pool=pool, slots=slots, snapshot_bytes=snapshot_bytes):
+                result = {'admitted': True, 'snapshot_slots': slots,
+                          'tracked': {'snapshot_bytes': {'bytes': snapshot_bytes}}}
+                if pool:
+                    result['pool_tokens'] = 16384
+                cmd = ['planner']
+                output = CompletedProcess(cmd, 0, json.dumps({'result': result}), '')
+                with patch('recipes.subprocess.run', return_value=output):
+                    if pool and slots == snapshot_bytes == 0:
+                        self.assertEqual(run_planner(cmd)['result'], result)
+                    else:
+                        with self.assertRaises(SystemExit):
+                            run_planner(cmd)
 
-    def test_prompt_cache_disables_at_infeasible_context_floor(self):
-        measurement = {'rooms': {'prompt_cache_budget': {'bytes': GIB}}}
-        with patch('recipes.run_planner', return_value={'result': measurement}):
-            self.assertEqual(choose_cache([], 64 * 1024, 2, measurement), (64 * 1024, 0, measurement))
-            self.assertEqual(choose_cache([], 63 * 1024, 2, measurement), (63 * 1024, 0, measurement))
+    def test_startup_uses_the_fixed_context_report_when_available(self):
+        result = {'admitted': True, 'context': 32768, 'pool_tokens': 131072}
+        output = io.StringIO()
+        with patch('recipes.run_planner', return_value={'result': result}) as run, contextlib.redirect_stdout(output):
+            startup(['32768', 'planner', '--prompt-cache-gib', '0'])
+        run.assert_called_once_with(['planner', '--prompt-cache-gib', '0'], 32768)
+        self.assertEqual(output.getvalue(), '32768 131072\n')
 
-    def test_spark_cache_falls_back_to_largest_whole_gib_at_floor(self):
-        def result(context):
-            return {'rooms': {'prompt_cache_budget': {'bytes': (70 * 1024 - context) * GIB // 1024}}}
-
-        with patch('recipes.run_planner', side_effect=lambda _, context: {'result': result(context)}):
-            context, gib, _ = choose_cache([], 70 * 1024, 8, result(70 * 1024))
-        self.assertEqual((context, gib), (64 * 1024, 6))
-
-    def test_paired_streams_reduce_only_when_vision_cannot_keep_the_cache_floor(self):
-        def at_floor(streams, context):
-            self.assertEqual(context, 65536)
-            return {'result': {'admitted': True, 'rooms': {'prompt_cache_budget': {'bytes': (5 - streams) * GIB}}}}
-
-        with patch('recipes.run_planner', side_effect=at_floor):
-            self.assertEqual(paired_streams(int, 4, 2), 3)
-            self.assertEqual(paired_streams(int, 3, 8), 3)
+    def test_startup_falls_back_to_the_automatic_plan_on_refusal(self):
+        refused = {'result': {'admitted': False, 'message': 'context exceeds capacity'}}
+        automatic = {'maximum': 16368, 'result': {'admitted': True, 'context': 16368, 'pool_tokens': 16384}}
+        output = io.StringIO()
+        with patch('recipes.run_planner', side_effect=[refused, automatic]) as run, contextlib.redirect_stdout(output):
+            startup(['32768', 'planner'])
+        self.assertEqual([call.args for call in run.call_args_list], [(['planner'], 32768), (['planner'],)])
+        self.assertEqual(output.getvalue(), '16368 16384\n')
 
     def test_card_context_cache_and_vision(self):
         for name, (card, _, _, vision, _) in SHIPPED.items():
             recipe = self.report(name)['recipe']
+            self.assertGreaterEqual(recipe['context'], 8192, name)
+            self.assertEqual(recipe['result']['snapshot_slots'], 0, name)
+            self.assertEqual(recipe['result']['tracked']['snapshot_bytes']['bytes'], 0, name)
+            self.assertNotIn('prompt_cache_gib', recipe, name)
             if card == '16':
-                self.assertGreaterEqual(recipe['context'], 32768, name)
-                self.assertEqual(recipe['prompt_cache_gib'], 0, name)
                 self.assertFalse(recipe['vision'], name)
-            else:
-                self.assertGreaterEqual(recipe['context'], 65536, name)
-                self.assertEqual(recipe['prompt_cache_gib'], CARDS[card]['cache_gib'], name)
-                if vision:
-                    text_plan = self.report(name.removesuffix('-vision'))
-                    self.assertLess(recipe['context'], text_plan['recipe']['context'], name)
-                    self.assertEqual(self.report(name)['parallel'], text_plan['parallel'], name)
+            if vision:
+                text_plan = self.report(name.removesuffix('-vision'))
+                self.assertLess(recipe['result']['pool_tokens'], text_plan['recipe']['result']['pool_tokens'], name)
+                self.assertEqual(self.report(name)['parallel'], text_plan['parallel'], name)
 
 
 if __name__ == '__main__':
