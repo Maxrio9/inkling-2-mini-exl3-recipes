@@ -6,7 +6,7 @@ cache=${XDG_CACHE_HOME:-"$HOME/.cache"}/inkling2-mini
 engine_repo=https://github.com/Maxrio9/TensorFold
 release_api=https://api.github.com/repos/Maxrio9/TensorFold/releases
 base_tag=inkling2-mini-exl3-v2
-source_pin=${INKLING_TENSORFOLD_SOURCE_PIN:-}
+source_pin=${INKLING_TENSORFOLD_SOURCE_PIN:-353717987a736b47f87039c89cfa675c820506c7}
 model_repo=Maxrio/Inkling-2-Mini-exl3
 drafter_repo=Maxrio/Inkling-2-Mini-DFlash2-FP8
 drafter_upstream=incoai/Inkling-2-Mini-DFlash2
@@ -213,7 +213,7 @@ if $dry; then
     if [[ $engine_archive ]]; then printf 'Would use engine archive %s.\n' "$engine_archive"
     elif $prebuilt; then printf 'Would check %s and newer releases for Linux %s and verify SHA256.\n' "$base_tag" "$arch"
     elif [[ $source_pin ]]; then printf 'Would build TensorFold for %s with Zig 0.17 and the CUDA toolkit.\n' "$sm"
-    else printf 'A local rc1 engine archive is required until a compatible release or source pin is available.\n'
+    else printf 'No prebuilt archive for this GPU: set INKLING_TENSORFOLD_SOURCE_PIN to build from source.\n'
     fi
     if [[ $model_dir ]]; then printf 'Would use local model %s.\n' "$model_dir"
     else printf 'Would refresh %s (%s) with hf and verify SHA256SUMS.\n' "$model_repo" "$branch"
@@ -331,7 +331,7 @@ PY
 fi
 
 if [[ ! $binary ]]; then
-    [[ $source_pin ]] || die 'No rc1-compatible release is available. Pass --engine-archive FILE for the local rc1 build.'
+    [[ $source_pin ]] || die 'No compatible TensorFold release was found. Pass --engine-archive FILE, or set INKLING_TENSORFOLD_SOURCE_PIN to build from source.'
     [[ $source_pin =~ ^[[:xdigit:]]{40}$ ]] || die 'INKLING_TENSORFOLD_SOURCE_PIN must be a full commit hash'
     nvcc=$(command -v nvcc) || die "No matching release archive. Install the CUDA toolkit (nvcc) to build for $sm."
     zig=$cache/zig-0.17.0-$arch/zig

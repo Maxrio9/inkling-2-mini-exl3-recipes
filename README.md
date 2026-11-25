@@ -1,6 +1,6 @@
 # Inkling 2 Mini on your GPU
 
-These TensorFold rc1 recipes run Inkling 2 Mini locally on NVIDIA GPUs through an OpenAI-compatible API. They pair Maxrio9's EXL3 weights with Inco AI's DFlash2 drafter. [EXL3 weights](https://huggingface.co/Maxrio/Inkling-2-Mini-exl3) · [Original DFlash2 checkpoint](https://huggingface.co/incoai/Inkling-2-Mini-DFlash2)
+These recipes run Inkling 2 Mini locally on NVIDIA GPUs through an OpenAI-compatible API, on the TensorFold engine release [`inkling2-mini-exl3-v2`](https://github.com/Maxrio9/TensorFold/releases/tag/inkling2-mini-exl3-v2). They pair Maxrio9's EXL3 weights with Inco AI's DFlash2 drafter. [EXL3 weights](https://huggingface.co/Maxrio/Inkling-2-Mini-exl3) · [Original DFlash2 checkpoint](https://huggingface.co/incoai/Inkling-2-Mini-DFlash2)
 
 ## Pick your card
 
@@ -29,10 +29,10 @@ The listed caps round the planner's maximum down to a multiple of 1,024 tokens. 
 
 ## Start
 
-1. From the rc1 recipes checkout, run `./start.sh --engine-archive /path/to/paged-archive.tar.gz`.
+1. Clone this repository and run `./start.sh`. It downloads the engine release, the model branch for your card and the drafter, verifies their checksums and starts the server.
 2. Once the server is ready, open [the model endpoint](http://127.0.0.1:8080/v1/models).
 
-The launcher uses Linux, Python 3.11 or newer, and the NVIDIA driver. Use the prepared local paged archive. `./start.sh --dry-run` shows the selected recipe. Add `--vision` before `--` to select the matching vision preset on a 24 GB or larger card. To start offline, supply `--engine-archive FILE` and `--model-dir DIR`. Drafted recipes also need a verified `dflash2/` bundle in that model directory or `-- --drafter DIR`. Run `./start.sh --help` for card, display, and model overrides. Pass TensorFold flags after `--`, as in `./start.sh -- --port 8081`.
+The launcher uses Linux, Python 3.11 or newer, the NVIDIA driver and the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli). Run it again to update everything. `./start.sh --dry-run` shows the selected recipe. Add `--vision` before `--` to select the matching vision preset on a 24 GB or larger card. To start offline, supply `--engine-archive FILE` and `--model-dir DIR`. Drafted recipes also need a verified `dflash2/` bundle in that model directory or `-- --drafter DIR`. Run `./start.sh --help` for card, display, and model overrides. Pass TensorFold flags after `--`, as in `./start.sh -- --port 8081`.
 
 On Blackwell, the launcher checks the 8-bit drafter repository [Maxrio/Inkling-2-Mini-DFlash2-FP8](https://huggingface.co/Maxrio/Inkling-2-Mini-DFlash2-FP8) and verifies `SHA256SUMS` before installing the bundle. If the package is absent, it downloads Inco AI's pinned BF16 checkpoint and checks each file against a pinned SHA-256 digest. Older GPUs use that BF16 checkpoint directly. The launcher exposes the verified bundle under the model's `dflash2/` path and uses it for both planning and serving.
 
@@ -42,7 +42,7 @@ The vision presets need the CUDA 13 cuBLAS runtime so TensorFold can find `libcu
 
 You need Linux with glibc 2.28 or newer, an NVIDIA driver that supports your GPU and CUDA 13, and the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli).
 
-1. **Verify and extract the prepared paged archive.** Use Linux x86_64 for RTX 30 (sm_86), RTX 40 (sm_89), RTX 50 and RTX PRO Blackwell (sm_120). Use Linux aarch64 for DGX Spark (GB10, sm_121). Check the archive against its accompanying SHA-256 digest.
+1. **Download, verify and extract the engine archive** from the [`inkling2-mini-exl3-v2` release](https://github.com/Maxrio9/TensorFold/releases/tag/inkling2-mini-exl3-v2). Use Linux x86_64 for RTX 30 (sm_86), RTX 40 (sm_89), RTX 50 and RTX PRO Blackwell (sm_120). Use Linux aarch64 for DGX Spark (GB10, sm_121). Check the archive against the release's `SHA256SUMS`.
 
    From the directory where you extracted the archive, enter its folder.
 
@@ -79,11 +79,11 @@ zig build -Dgpu=sm_120 -Dnvcc="$(command -v nvcc)"
 
 Use `zig-out/native/bin/tensorfold-native` in step 3. The TensorFold checkout's `RUNBOOK.md` describes how to build the grammar library alongside the native binary.
 
-## RC1 speed measurements
+## Speed measurements
 
 The final paged build passed the 3% desktop throughput gate for single-request code, single-request prose, and four mixed requests. [Paged build results](data/MEASUREMENTS.md)
 
-On RTX PRO 4500, the rc1 head-precision bracket served the 3.3bpw target with FP8 KV and FP8 DFlash2 layers. Each phase used three greedy repeats, 8,192 input tokens, 400 output tokens and disabled prompt caching.
+On RTX PRO 4500, the head-precision bracket served the 3.3bpw target with FP8 KV and FP8 DFlash2 layers. Each phase used three greedy repeats, 8,192 input tokens, 400 output tokens and disabled prompt caching.
 
 | Workload | BF16 head control A | FP8 head | BF16 head control B | Pooled BF16 head median |
 |---|---:|---:|---:|---:|
@@ -94,7 +94,7 @@ Rates are median decode tokens per second. FP8 heads are the Blackwell default.
 
 ### DGX Spark comparison
 
-The RC1 Spark tests used DFlash2 with FP8 layers and head, disabled prompt caching, 8,192 input tokens and 400 greedy output tokens per request. Each rate is the median of three runs in decode tokens per second. The 4- and 8-request rates aggregate a fixed mix of code and prose over their common decode interval.
+The Spark tests used DFlash2 with FP8 layers and head, disabled prompt caching, 8,192 input tokens and 400 greedy output tokens per request. Each rate is the median of three runs in decode tokens per second. The 4- and 8-request rates aggregate a fixed mix of code and prose over their common decode interval.
 
 | EXL3 branch | Target KV | 1 code | 1 prose | 4 mixed | 8 mixed |
 |---|---|---:|---:|---:|---:|
@@ -158,6 +158,15 @@ These contributors supplied upstream work used in the port.
 - @grantoverton — [#4471](https://github.com/ashhart/TensorFold/pull/4471)
 - @cwschroeder — [#4784](https://github.com/ashhart/TensorFold/pull/4784)
 
+## License
+
+The recipes, launcher, calculator and documentation in this repository are licensed under the Apache License, Version 2.0 ([LICENSE](LICENSE)). The work they use keeps its own license; [NOTICE](NOTICE) lists each one.
+
+- Inkling 2 Mini by Thinking Machines: Apache-2.0, with the [Model Acceptable Use Policy](https://thinkingmachines.ai/model-acceptable-use-policy/). The EXL3 weights are a quantized derivative under the same terms.
+- TensorFold and the Maxrio9 fork: Apache-2.0; code written before TensorFold 0.6.0 keeps its MIT notice. MiaAI-Lab's patches in the fork: Apache-2.0.
+- Inco AI's DFlash2 checkpoint and our 8-bit conversion of it: Apache-2.0. z-lab's DFlash: MIT.
+- xgrammar and dlpack, inside the release archive's grammar library: Apache-2.0.
+
 ## For agents and advanced use
 
 | Serve flag | What it does |
@@ -173,11 +182,11 @@ These contributors supplied upstream work used in the port.
 | `--host HOST`, `--port PORT` | Set the listen address and port. |
 | `--name NAME` | Sets the model ID clients use. |
 
-The rc1 CUDA backend supports automatic, required and named tool calls and schema-constrained replies through `response_format` with `type: "json_schema"`. Required and schema-constrained replies use the grammar library in the release archive.
+The CUDA backend supports automatic, required and named tool calls and schema-constrained replies through `response_format` with `type: "json_schema"`. Required and schema-constrained replies use the grammar library in the release archive.
 
 ### Make your own config
 
-The calculator asks TensorFold's planner (`tensorfold-native plan`) and prints TOML. The planner reads the downloaded model branch and needs no GPU. Use the paged Mini build of the planner.
+The calculator asks TensorFold's planner (`tensorfold-native plan`) and prints TOML. The planner reads the downloaded model branch and needs no GPU. The planner ships in the release archive.
 
 ```sh
 python3 tools/recipes.py --card 24 --model ./inkling-mini --drafter ./inkling-mini/dflash2 > recipe.toml

@@ -1,0 +1,38 @@
+Inkling 2 Mini EXL3 recipes
+Copyright 2026 Maxrio9
+https://github.com/Maxrio9/inkling-2-mini-exl3-recipes
+
+The recipes, launcher (start.sh), calculator (tools/) and documentation in this repository are
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository contains no third-party code or weights. start.sh downloads the following, each
+under its own license:
+
+Inkling 2 Mini
+  https://huggingface.co/thinkingmachines/Inkling-2-Mini
+  Copyright Thinking Machines. Apache License, Version 2.0, with the Model Acceptable Use Policy
+  (https://thinkingmachines.ai/model-acceptable-use-policy/).
+  The EXL3 weights at https://huggingface.co/Maxrio/Inkling-2-Mini-exl3 are a quantized
+  derivative of this model, released under the same terms.
+
+TensorFold (Maxrio9 fork, branch inkling2-mini-exl3, release inkling2-mini-exl3-v2)
+  https://github.com/Maxrio9/TensorFold, forked from https://github.com/ashhart/TensorFold
+  Copyright 2026 TensorFold contributors. Apache License, Version 2.0 from TensorFold 0.6.0; code
+  written before 0.6.0 keeps its MIT notice (LICENSES/MIT.txt in the engine). The fork includes
+  work by @francip, @ajensenwaud, Jürgen Schmied (@jschmied), @ashhart, @BlivionIaG,
+  @grantoverton and @cwschroeder from upstream pull requests, and patches by MiaAI-Lab
+  (Copyright 2026 MiaAI-Lab, https://github.com/MiaAI-Lab/Inkling-2-Mini-DGX-Spark-TensorFold,
+  Apache License, Version 2.0). The release archives carry the engine's LICENSE, LICENSES/,
+  NOTICE and THIRD_PARTY_NOTICES.md.
+
+xgrammar and dlpack (inside the release archives' libtfgrammar.so)
+  https://github.com/mlc-ai/xgrammar, https://github.com/dmlc/dlpack
+  Apache License, Version 2.0. Their license and notice files ship in the archives.
+
+DFlash2 drafter
+  https://huggingface.co/incoai/Inkling-2-Mini-DFlash2 by Inco AI (https://inco.ai/blog/dflash2/),
+  Apache License, Version 2.0. https://huggingface.co/Maxrio/Inkling-2-Mini-DFlash2-FP8 is
+  Maxrio9's modified version (projection weights converted to FP8 for TensorFold), Apache License,
+  Version 2.0, with the modification notice in its README.
+  DFlash2 builds on DFlash by z-lab (https://github.com/z-lab/dflash), MIT License,
+  Copyright (c) 2026 Z Lab.

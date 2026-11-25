@@ -1,6 +1,6 @@
 # TensorFold measurements
 
-## Paged CUDA release candidate
+## v2 engine: shared KV pool
 
 The [planner receipts](planner/) report the shared global KV pool, per-request context cap and fixed bytes per stream. Prefix retention takes pages on demand from that pool for both the global KV rows and restart state. The planner reports the effective limit in retained pages, bytes and marks. Restart state has no reserved allocation. All 15 recipes use the same 3.3 bpw and 4.0 bpw checkpoint headers and FP8 DFlash2 bundle as the earlier build. The 24 GB, 32 GB and Spark recipes plan for 2, 4 and 8 requests, with the same counts for text and vision.
 
@@ -10,9 +10,9 @@ On the RTX PRO 4500 with a 15.09375 GiB engine cap and 0.5 GiB reserve, the fina
 
 ### RTX 4090 launcher memory check
 
-The live launcher used a simulated RTX 4090 memory reading of 24,564 MiB total and 24,000 MiB free. The real planner read the 4.0 bpw checkpoint headers and the SHA-256-verified, pinned BF16 DFlash2 bundle at compute capability 89. With 23,665 MiB effective free, it reduced the 24 GB preset’s cap from 340,992 to 309,744 tokens. It admitted two requests sharing a 310,016-token pool, with 988,977,664 bytes of BF16 drafter weights and 23,740,413,488 bytes tracked at startup. The launcher supplied that cap and the same BF16 drafter path to the serve command. This fixture checked the planner and launch arguments on the desktop without loading weights on an RTX 4090. The receipt is `paged-build/fix2/launcher-4090-final/` in the run folder.
+The live launcher used a simulated RTX 4090 memory reading of 24,564 MiB total and 24,000 MiB free. The real planner read the 4.0 bpw checkpoint headers and the SHA-256-verified, pinned BF16 DFlash2 bundle at compute capability 89. With 23,665 MiB effective free, it reduced the 24 GB preset’s cap from 340,992 to 309,744 tokens. It admitted two requests sharing a 310,016-token pool, with 988,977,664 bytes of BF16 drafter weights and 23,740,413,488 bytes tracked at startup. The launcher supplied that cap and the same BF16 drafter path to the serve command. This fixture checked the planner and launch arguments on the desktop without loading weights on an RTX 4090.
 
-The ThinkStation RTX 3070 Ti ran the no-model paged attention contract on sm_86. Eight paged attention contracts and two FP8 preparation checks passed with the same kernel images as the final x86_64 archive. The receipt is `paged-build/fix2/thinkstation/contract.log` in the run folder.
+An RTX 3070 Ti ran the no-model paged attention contract on sm_86. Eight paged attention contracts and two FP8 preparation checks passed with the same kernel images as the final x86_64 archive.
 
 ### Prefix reuse with reclaimable state
 
@@ -49,16 +49,16 @@ Output token IDs matched across all three arms in each workload. For C1 code the
 
 ### Spark throughput after the warmup change
 
-The final aarch64 archive ran on Spark1 with the same 4.0 bpw target, FP8 settings, container image, and 100 GiB caps as both RC1 controls. Three repeats per arm returned matching output IDs.
+The final aarch64 archive ran on DGX Spark with the same 4.0 bpw target, FP8 settings, container image, and 100 GiB caps as both RC1 controls. Three repeats per arm returned matching output IDs.
 
 | Workload | RC1 A | Fixed paged | RC1 B | Pooled RC1 | Change | 3% floor |
 |---|---:|---:|---:|---:|---:|---|
-| Spark1 C1 code | 84.50 | 84.95 | 86.82 | 84.67 | +0.34% | Pass |
-| Spark1 C8 mixed | 97.77 | 97.77 | 97.07 | 97.50 | +0.28% | Pass |
+| DGX Spark C1 code | 84.50 | 84.95 | 86.82 | 84.67 | +0.34% | Pass |
+| DGX Spark C8 mixed | 97.77 | 97.77 | 97.07 | 97.50 | +0.28% | Pass |
 
-The candidate's minimum sampled host MemAvailable was 92.95 GiB. The final bracket and raw logs are in `paged-build/fix/spark/` in the run folder.
+The candidate's minimum sampled host MemAvailable was 92.95 GiB.
 
-### Initial paged build
+### First paged build (superseded by the warmup change above)
 
 The following results predate the removal of reserved snapshot slots.
 
